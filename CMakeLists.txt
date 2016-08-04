@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 2.6)
 project (PAMPARAM)
 
+find_path(PAM_INCLUDE NAMES "pam_modules.h" PATH_SUFFIXES "security" "pam")
+
 add_library(pam_param MODULE pam-param.c)
 set_target_properties(pam_param PROPERTIES PREFIX "")
+target_include_directories(pam_param PRIVATE ${PAM_INCLUDE})
