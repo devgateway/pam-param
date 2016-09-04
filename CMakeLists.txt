@@ -9,3 +9,4 @@ target_include_directories(pam_param PRIVATE ${PAM_INCLUDE} inih)
 target_link_libraries(pam_param PRIVATE inih)
 
 add_library(inih STATIC inih/ini.c)
+target_compile_definitions(inih PRIVATE INI_MAX_LINE=512)
