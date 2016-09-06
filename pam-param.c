@@ -8,21 +8,28 @@
 #include "pam-param.h"
 #include "inih/ini.h"
 
-static int handler (void* user, const char* section, const* char name, const char* value) {
-	config* pconfig = (config *)user;
-	#define SECTION(s, n) strcmp(s,section)==0
+static int handler(void *user, const char *section, const char *name, const char *value);
+int config_read(const char *filename);
+
+/* global variable */
+config cfg;
+
+static int handler (void *user, const char *section, const char *name, const char *value) {
+	
+	#define SECTION(s) strcmp(s,section)==0
 	#define NAME(n) strcmp(n,name)==0
+
 	if (SECTION("")) {
 		if (NAME("short_name")) {
-			pconfig->short_name = atoi(value);
+			cfg.short_name = atoi(value);
 		}
 	} else if (SECTION("ldap")) {
 		if (NAME("uri")) {
-			pconfig->ldap_uri = strdup(value);
+			cfg.ldap_uri = strdup(value);
 		} else if (NAME("binddn")) {
-			pconfig->ldap_dn = strdup(value);
+			cfg.ldap_dn = strdup(value);
 		} else if (NAME("bindpw")) {
-			pconfig->ldap_pw = strdup(value);
+			cfg.ldap_pw = strdup(value);
 		} else {
 			return 0;
 		}
@@ -30,13 +37,13 @@ static int handler (void* user, const char* section, const* char name, const cha
 		ldap_query *q;
 
 		if (SECTION("admin")) {
-			q = &(pconfig->admin);
+			q = &(cfg.admin);
 		} else if (SECTION("user")) {
-			q = &(pconfig->user);
+			q = &(cfg.user);
 		} else if (SECTION("host")) {
-			q = &(pconfig->host);
+			q = &(cfg.host);
 		} else if (SECTION("membership")) {
-			q = &(pconfig->membership);
+			q = &(cfg.membership);
 		} else {
 			return 0;
 		}
@@ -55,14 +62,13 @@ static int handler (void* user, const char* section, const* char name, const cha
 
 }
 
-/* returns NULL on failure */
-config *config_read(const char *filename) {
-	config conf;
-	if (parse_ini(CONFIG_FILE, handler, &conf) < 0 ) {
-		prinft("Can't load configuration file:%s\n",INI_FILE);
-		return NULL;
+/* returns non-zero on failure */
+int config_read (const char *filename) {
+
+	if (ini_parse(CONFIG_FILE, handler, NULL) < 0 ) {
+		return 1;
 	}
-	return *conf;
+	return 0;
 }
 
 /* return object count or LDAP_FAIL */
