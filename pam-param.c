@@ -9,8 +9,6 @@
 #include "pam-param.h"
 #include "inih/ini.h"
 
-static int handler(void *user, const char *section, const char *name, const char *value);
-
 config cfg;
 
 static int handler (void *user, const char *section, const char *name, const char *value) {
@@ -65,7 +63,8 @@ int count_entries(LDAP *ld, const ldap_query *query) {
 }
 
 void shorten_name(char *host_name, int len) {
-	for (char *c = host_name; c < host_name + len; c++) {
+	char *c;
+	for (c = host_name; c < host_name + len; c++) {
 		switch (*c) {
 			case '.':	*c = 0;
 			case 0:	  return;
@@ -86,7 +85,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 
 	/* TODO: check if is super admin */
 
-	int rc = gethostname(host_name, HOST_NAME_MAX);
+	rc = gethostname(host_name, HOST_NAME_MAX);
 	if (rc) return PAM_AUTH_ERR;
 	if (cfg.short_name) shorten_name(host_name, HOST_NAME_MAX);
 
