@@ -10,9 +10,7 @@
 #include "inih/ini.h"
 
 static int handler(void *user, const char *section, const char *name, const char *value);
-int config_read(const char *filename);
 
-/* global variable */
 config cfg;
 
 static int handler (void *user, const char *section, const char *name, const char *value) {
@@ -60,16 +58,6 @@ static int handler (void *user, const char *section, const char *name, const cha
 		}
 	}
 	return 1;
-
-}
-
-/* returns zero on failure */
-int config_read (const char *filename) {
-
-	if (ini_parse(CONFIG_FILE, handler, NULL) < 0 ) {
-		return 0;
-	}
-	return 1;
 }
 
 /* return object count or LDAP_FAIL */
@@ -90,7 +78,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	int rc;
 	char host_name[HOST_NAME_MAX];
 
-	rc = config_read(CONFIG_FILE);
+	rc = ini_parse(CONFIG_FILE, handler, NULL);
 	if (!rc) return PAM_BUF_ERR;
 
 	/* TODO: get user name from PAM */
