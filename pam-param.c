@@ -4,6 +4,7 @@
 #include <limits.h>
 #include <sys/types.h>
 #include <ldap.h>
+#include <stdlib.h>
 
 #include "pam-param.h"
 #include "inih/ini.h"
@@ -62,13 +63,13 @@ static int handler (void *user, const char *section, const char *name, const cha
 
 }
 
-/* returns non-zero on failure */
+/* returns zero on failure */
 int config_read (const char *filename) {
 
 	if (ini_parse(CONFIG_FILE, handler, NULL) < 0 ) {
-		return 1;
+		return 0;
 	}
-	return 0;
+	return 1;
 }
 
 /* return object count or LDAP_FAIL */
@@ -89,8 +90,8 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	int rc;
 	char host_name[HOST_NAME_MAX];
 
-	config *cfg = config_read(CONFIG_FILE);
-	if (!cfg) return PAM_BUF_ERR;
+	rc = config_read(CONFIG_FILE);
+	if (!rc) return PAM_BUF_ERR;
 
 	/* TODO: get user name from PAM */
 
