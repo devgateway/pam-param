@@ -64,14 +64,13 @@ static int handler (void *user, const char *section, const char *name, const cha
 int count_entries(LDAP *ld, const ldap_query *query) {
 }
 
-/* get host name, optionally chopped at first dot; return 0 on success */
-int get_host_name(char *host_name) {
-	int rc = gethostname(host_name, HOST_NAME_MAX);
-	if (rc) return rc;
-
-	/* TODO: chop */
-
-	return 0;
+void shorten_name(char *host_name, int len) {
+	for (char *c = host_name; c < host_name + len; c++) {
+		switch (*c) {
+			case '.':	*c = 0;
+			case 0:	  return;
+		}
+	}
 }
 
 int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv) {
@@ -87,8 +86,9 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 
 	/* TODO: check if is super admin */
 
-	rc = get_host_name(host_name);
-	if ( !rc ) return PAM_BUF_ERR;
+	int rc = gethostname(host_name, HOST_NAME_MAX);
+	if (rc) return PAM_AUTH_ERR;
+	if (cfg.short_name) shorten_name(host_name, HOST_NAME_MAX);
 
 	/* TODO: check if access permitted */
 
