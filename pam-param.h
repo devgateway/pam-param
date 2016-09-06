@@ -11,11 +11,13 @@ typedef struct {
 
 typedef struct {
 	int short_name;
-	const char *ldap_url;
-	const char *ldap_user;
-	const char *ldap_pass;
+	const char *ldap_uri;
+	const char *ldap_dn;
+	const char *ldap_pw;
 	ldap_query admin;
-	ldap_query member;
+	ldap_query user;
+	ldap_query host;
+	ldap_query membership;
 } config;
 
 #ifndef CONFIG_FILE
