@@ -91,7 +91,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	rc = ldap_initialize(ld, conf.ldap_uri);
 	if (rc != LDAP_SUCCESS) return rc;
 
-	rc = ldap_simple_bind(ld, conf.ldap_dn, conf.ldap_pw);
+	rc = ldap_simple_bind_s(ld, conf.ldap_dn, conf.ldap_pw);
 	if (rc != LDAP_SUCCESS) return rc;
 
 	/* TODO: check if is super admin */
