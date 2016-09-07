@@ -80,7 +80,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	if (!rc) return PAM_BUF_ERR;
 
 	/* get user name from PAM */
-	char **user_name;
+	const char **user_name;
 	rc = pam_get_user(pamh, user_name, NULL);
 	if (rc != PAM_SUCCESS) return rc;
 
