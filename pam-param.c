@@ -113,7 +113,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	int rc;
 	char host_name[HOST_NAME_MAX];
 	const char **user_name;
-	LDAP **ld;
+	LDAP *ld;
 
 	rc = ini_parse(CONFIG_FILE, handler, NULL);
 	if (!rc) return PAM_BUF_ERR;
@@ -123,7 +123,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	if (rc != PAM_SUCCESS) return rc;
 
 	/* connect to LDAP */
-	rc = ldap_initialize(ld, cfg.ldap_uri);
+	rc = ldap_initialize(&ld, cfg.ldap_uri);
 	if (rc != LDAP_SUCCESS) return rc;
 
 	struct berval cred;

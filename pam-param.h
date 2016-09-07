@@ -13,7 +13,7 @@ typedef struct {
 	int short_name;
 	const char *ldap_uri;
 	const char *ldap_dn;
-	const char *ldap_pw;
+	char *ldap_pw;
 	ldap_query admin;
 	ldap_query user;
 	ldap_query host;
