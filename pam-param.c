@@ -103,7 +103,8 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	/* TODO: check if access permitted */
 
 	/* TODO: disconnect from LDAP */
-
+	rc = ldap_unbind(ld);
+	if (rc != LDAP_SUCCESS) return rc;
 
 	return PAM_SUCCESS;
 }
