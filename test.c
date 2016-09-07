@@ -1,5 +1,4 @@
 #include "pam-param.c"
-#define CONFIG_FILE "samples/pam-param.ini"
 
 int main() { 
 

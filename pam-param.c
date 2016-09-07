@@ -77,7 +77,7 @@ void shorten_name(char *host_name, int len) {
 int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv) {
 	int rc;
 	char host_name[HOST_NAME_MAX];
-	char **user_name;
+	const char **user_name;
 	LDAP **ld;
 
 	rc = ini_parse(CONFIG_FILE, handler, NULL);
