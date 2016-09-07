@@ -11,6 +11,40 @@
 
 config cfg;
 
+static char * ldap_escape_filter(const char *filter) {
+	char map[256] = {0};
+	char unsafe[] = "\\*()\0";
+	char hex[] = "0123456789abcdef";
+	char *result;
+	int i, p = 0;
+	size_t len = 1;
+
+	/* map unsafe character */
+	while ( i < sizeof(unsafe) ) {
+		map[(unsigned char) unsafe[i++]] = 1;
+	}
+
+	/* count required memory for the result string */
+	for (i = 0; i < sizeof(unsafe); i++) {
+		len += (map[(unsigned char) filter[i]]) ? 3 : 1;
+	}
+
+	result = (char *) malloc(len);
+	for (i = 0; i < strlen(filter); i++) {
+		unsigned char v = (unsigned char) filter[i];
+
+		if (map[v]) {
+			result[p++] = '\\';
+			result[p++] = hex[v >> 4];
+			result[p++] = hex[v & 0x0f];
+		} else {
+			result[p++] = v;
+		}
+	}
+
+	result[p++] = '\0';
+}
+
 /* handler for ini parser */
 static int handler (void *user, const char *section, const char *name, const char *value) {
 	
