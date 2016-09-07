@@ -11,6 +11,7 @@
 
 config cfg;
 
+/* handler for ini parser */
 static int handler (void *user, const char *section, const char *name, const char *value) {
 	
 	#define SECTION(s) strcmp(s,section)==0
@@ -62,6 +63,7 @@ static int handler (void *user, const char *section, const char *name, const cha
 int count_entries(LDAP *ld, const ldap_query *query) {
 }
 
+/* get short hostname */
 void shorten_name(char *host_name, int len) {
 	char *c;
 	for (c = host_name; c < host_name + len; c++) {
@@ -75,16 +77,22 @@ void shorten_name(char *host_name, int len) {
 int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv) {
 	int rc;
 	char host_name[HOST_NAME_MAX];
+	char **user_name;
+	LDAP **ld;
 
 	rc = ini_parse(CONFIG_FILE, handler, NULL);
 	if (!rc) return PAM_BUF_ERR;
 
 	/* get user name from PAM */
-	char **user_name;
 	rc = pam_get_user(pamh, user_name, NULL);
 	if (rc != PAM_SUCCESS) return rc;
 
-	/* TODO: connect to LDAP */
+	/* connect to LDAP */
+	rc = ldap_initialize(ld, conf.ldap_uri);
+	if (rc != LDAP_SUCCESS) return rc;
+
+	rc = ldap_simple_bind(ld, conf.ldap_dn, conf.ldap_pw);
+	if (rc != LDAP_SUCCESS) return rc;
 
 	/* TODO: check if is super admin */
 
@@ -95,6 +103,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	/* TODO: check if access permitted */
 
 	/* TODO: disconnect from LDAP */
+
 
 	return PAM_SUCCESS;
 }
