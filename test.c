@@ -6,7 +6,7 @@ int main() {
 	char host_name[HOST_NAME_MAX];
 
 	rc = ini_parse(CONFIG_FILE, handler, NULL);
-	if (!rc) return 1;
+	if (rc) return 1;
 
 	/* TODO: get user name from PAM */
 

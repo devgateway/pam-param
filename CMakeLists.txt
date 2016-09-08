@@ -15,6 +15,7 @@ set_target_properties(inih PROPERTIES POSITION_INDEPENDENT_CODE true)
 add_executable(smoketest test.c)
 target_include_directories(smoketest PRIVATE ${PAM_INCLUDE} inih)
 target_link_libraries(smoketest inih ldap pam)
+target_compile_definitions(smoketest PRIVATE CONFIG_FILE="${CMAKE_CURRENT_SOURCE_DIR}/samples/pam-param.ini")
 
 enable_testing()
 add_test(NAME smoke COMMAND $<TARGET_FILE:smoketest>)

@@ -12,7 +12,7 @@
 
 config cfg;
 
-static char * ldap_escape_filter(const char *filter) {
+static char *ldap_escape_filter(const char *filter) {
 	char map[256] = {0};
 	char unsafe[] = "\\*()\0";
 	char hex[] = "0123456789abcdef";
@@ -116,7 +116,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	LDAP *ld;
 
 	rc = ini_parse(CONFIG_FILE, handler, NULL);
-	if (!rc) return PAM_BUF_ERR;
+	if (rc) return PAM_AUTH_ERR;
 
 	/* get user name from PAM */
 	rc = pam_get_user(pamh, user_name, NULL);
