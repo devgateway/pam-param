@@ -1,5 +1,4 @@
 #include "pam-param.c"
-
 int main() { 
 
 	int rc;
@@ -26,11 +25,10 @@ int main() {
 
 	/* TODO: check if is super admin */
 
+	/*to test escaped use: string = "\\this*is(a)test\0";*/
 	rc = gethostname(host_name, HOST_NAME_MAX);
 	if (rc) return 5;
 	if (cfg.short_name) shorten_name(host_name, HOST_NAME_MAX);
-
-	return 0;
 
 	/* TODO: check if access permitted */
 
@@ -38,5 +36,5 @@ int main() {
 	rc = ldap_unbind_ext(ld, NULL, NULL);
 	if (rc != LDAP_SUCCESS) return rc;
 
-
+	return 0;
 }
