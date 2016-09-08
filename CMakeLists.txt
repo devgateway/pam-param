@@ -18,4 +18,5 @@ target_link_libraries(smoketest inih ldap pam)
 target_compile_definitions(smoketest PRIVATE CONFIG_FILE="${CMAKE_CURRENT_SOURCE_DIR}/samples/pam-param.ini")
 
 enable_testing()
-add_test(NAME smoke COMMAND $<TARGET_FILE:smoketest>)
+add_test(NAME "Parse_sample_INI_file" COMMAND $<TARGET_FILE:smoketest> 0)
+add_test(NAME "Get_host_name" COMMAND $<TARGET_FILE:smoketest> 1)

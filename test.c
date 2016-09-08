@@ -1,28 +1,40 @@
 #include "pam-param.c"
+#define FAIL 1
+#define PASS 0
 
-int main() { 
-
+int main(int argc, const char *argv[]) { 
 	int rc;
 	char host_name[HOST_NAME_MAX];
 
-	rc = ini_parse(CONFIG_FILE, handler, NULL);
-	if (rc) return 1;
+	if (argc != 2) {
+		fprintf(stderr, "One numeric argument required: test number.\n");
+		return FAIL;
+	}
 
-	/* TODO: get user name from PAM */
+	int test = atoi(argv[1]);
 
-	/* TODO: connect to LDAP */
+	switch (test) {
+		case 0:
+			rc = ini_parse(CONFIG_FILE, handler, NULL);
+			return rc ? FAIL : PASS;
 
-	/* TODO: check if is super admin */
+			/* TODO: get user name from PAM */
 
-	rc = gethostname(host_name, HOST_NAME_MAX);
-	if (rc) return 5;
-	if (cfg.short_name) shorten_name(host_name, HOST_NAME_MAX);
+			/* TODO: connect to LDAP */
 
-	return 0;
+			/* TODO: check if is super admin */
 
-	/* TODO: check if access permitted */
+		case 1:
+			rc = gethostname(host_name, HOST_NAME_MAX);
+			if (rc) return FAIL;
+			if (cfg.short_name) shorten_name(host_name, HOST_NAME_MAX);
+			return PASS;
 
-	/* TODO: disconnect from LDAP */
+			/* TODO: check if access permitted */
 
-
+			/* TODO: disconnect from LDAP */
+		default:
+			fprintf(stderr, "Invalid test number: %i.\n", test);
+			return FAIL;
+	}
 }
