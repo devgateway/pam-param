@@ -1,6 +1,15 @@
-#include "pam-param.c"
+#include <limits.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+#include "inih/ini.h"
+#include "pam-param.h"
+
 #define FAIL 1
 #define PASS 0
+
+extern config cfg;
 
 int main(int argc, const char *argv[]) { 
 	int rc;

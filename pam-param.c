@@ -1,10 +1,10 @@
 #define _XOPEN_SOURCE 700
 
-#include <unistd.h>
 #include <limits.h>
+#include <unistd.h>
+#include <stdlib.h>
 #include <sys/types.h>
 #include <ldap.h>
-#include <stdlib.h>
 #include <lber.h>
 
 #include "pam-param.h"
@@ -12,7 +12,7 @@
 
 config cfg;
 
-static char *ldap_escape_filter(const char *filter) {
+char *ldap_escape_filter(const char *filter) {
 	char map[256] = {0};
 	char unsafe[] = "\\*()\0";
 	char hex[] = "0123456789abcdef";
@@ -47,7 +47,7 @@ static char *ldap_escape_filter(const char *filter) {
 }
 
 /* handler for ini parser */
-static int handler(void *user, const char *section, const char *name, const char *value) {
+int handler(void *user, const char *section, const char *name, const char *value) {
 	
 	#define SECTION(s) strcmp(s,section)==0
 	#define NAME(n) strcmp(n,name)==0
