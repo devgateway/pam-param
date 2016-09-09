@@ -48,7 +48,7 @@ static char * ldap_escape_filter(const char *filter) {
 
 /* handler for ini parser */
 static int handler(void *user, const char *section, const char *name, const char *value) {
-	
+
 	#define SECTION(s) strcmp(s,section)==0
 	#define NAME(n) strcmp(n,name)==0
 
@@ -107,6 +107,21 @@ void shorten_name(char *host_name, int len) {
 			case 0:	  return;
 		}
 	}
+}
+
+int get_dn(LDAP *ld, ldap_query q, char *dn) {
+
+	int rc;
+	LDAPMessage *res;
+	LDAPMessage *ent;
+
+	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, LDAP_NO_ATTRS, 1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
+    if (ldap_count_entries != 1) return LDAP_INAPPROPRIATE_AUTH;
+	ent = ldap_first_entry(ld,res);
+	dn = ldap_get_dn(ld, ent);
+
+	free(res);
+    return 0;
 }
 
 int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv) {
