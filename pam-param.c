@@ -48,7 +48,7 @@ char *ldap_escape_filter(const char *filter) {
 
 /* handler for ini parser */
 int handler(void *user, const char *section, const char *name, const char *value) {
-	
+
 	#define SECTION(s) strcmp(s,section)==0
 	#define NAME(n) strcmp(n,name)==0
 
@@ -124,6 +124,16 @@ int get_dn(LDAP *ld, ldap_query q, char *dn) {
     return 0;
 }
 
+void complete_ldap_query (ldap_query q, char *str) {
+    char *res;
+    size_t full_length;
+    full_len = strlen(q.filter) - 2 + strlen(str) + 1;
+    res = (char *)malloc(full_len * sizeof(char));
+    snprintf(res, full_len, q.filter, add);
+    free(q.filter);
+    q.filter = res;
+}
+
 int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv) {
 	int rc;
 	char host_name[HOST_NAME_MAX];
@@ -150,13 +160,14 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 
 	/* TODO: check if is super admin */
 
+    /* get hostname from pam*/
 	rc = gethostname(host_name, HOST_NAME_MAX);
 	if (rc) return PAM_AUTH_ERR;
 	if (cfg.short_name) shorten_name(host_name, HOST_NAME_MAX);
 
 	/* TODO: check if access permitted */
 
-	/* TODO: disconnect from LDAP */
+	/* disconnect from LDAP */
 	rc = ldap_unbind_ext(ld, NULL, NULL);
 	if (rc != LDAP_SUCCESS) return rc;
 
