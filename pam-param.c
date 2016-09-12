@@ -1,4 +1,7 @@
 #define _XOPEN_SOURCE 700
+#define TRUE 1
+#define FALSE 0
+#define ERROR -1
 
 #include <limits.h>
 #include <unistd.h>
@@ -116,12 +119,15 @@ int get_dn(LDAP *ld, ldap_query q, char *dn) {
 	LDAPMessage *ent;
 
 	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, LDAP_NO_ATTRS, 1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
-    if (ldap_count_entries(ld, res) != 1) return LDAP_INAPPROPRIATE_AUTH;
+    if (ldap_count_entries(ld, res) != 1) {
+        free(res);
+        return ERROR;
+    }
 	ent = ldap_first_entry(ld,res);
 	dn = ldap_get_dn(ld, ent);
 
 	free(res);
-    return 0;
+    return TRUE;
 }
 
 void complete_ldap_query (ldap_query q, char *a, char *b) {
