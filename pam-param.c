@@ -116,7 +116,7 @@ int get_dn(LDAP *ld, ldap_query q, char *dn) {
 	LDAPMessage *ent;
 
 	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, LDAP_NO_ATTRS, 1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
-    if (ldap_count_entries != 1) return LDAP_INAPPROPRIATE_AUTH;
+    if (ldap_count_entries(ld, res) != 1) return LDAP_INAPPROPRIATE_AUTH;
 	ent = ldap_first_entry(ld,res);
 	dn = ldap_get_dn(ld, ent);
 
@@ -124,12 +124,21 @@ int get_dn(LDAP *ld, ldap_query q, char *dn) {
     return 0;
 }
 
-void complete_ldap_query (ldap_query q, char *str) {
+void complete_ldap_query (ldap_query q, char *a, char *b) {
     char *res;
     size_t full_length;
-    full_len = strlen(q.filter) - 2 + strlen(str) + 1;
+    full_len = strlen(q.filter) + 1;
+
+    if (!a && !b) return;
+    if (a) {
+       full_len = full_len - 2 + strlen(a);
+    }
+    if (b) {
+       full_len = full_len - 2 + strlen(b);
+    }
+
     res = (char *)malloc(full_len * sizeof(char));
-    snprintf(res, full_len, q.filter, add);
+    snprintf(res, full_len, q.filter, a, b);
     free(q.filter);
     q.filter = res;
 }
