@@ -161,6 +161,28 @@ int is_super_admin (LDAP *ld) {
     return 1;
 }
 
+/*returns 1 if user is permitted*/
+int user_permitted (LDAP *ld) {
+    char *user_dn;
+    char *host_dn;
+    int rc;
+    ldap_query q = cfg.membership;
+    LDAPMessage *res;
+
+    rc = get_dn(ld, cfg.user, user_dn);
+    if (rc !=0 ) return rc;
+    rc = get_dn(ld, cfg.host, host_dn);
+    if (rc !=0 ) return rc;
+    complete_ldap_query (q, user_dn, host_dn);
+
+	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, LDAP_NO_ATTRS, 1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
+    if (ldap_count_entries(ld, res) != 1) return LDAP_INAPPROPRIATE_AUTH;
+
+    ldap_mem_free(user_dn);
+    ldap_mem_free(host_dn);
+    return 1;
+}
+
 int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv) {
 	int rc;
 	char host_name[HOST_NAME_MAX];
@@ -200,11 +222,13 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	if (cfg.short_name) shorten_name(host_name, HOST_NAME_MAX);
     complete_ldap_query(cfg.host,host_name);
 
-	/* TODO: check if access permitted */
+	/* check if access permitted */
+    if (user_permitted(ld)) {
+        /* disconnect from LDAP */
+        rc = ldap_unbind_ext(ld, NULL, NULL);
+        if (rc != LDAP_SUCCESS) return rc;
+        return PAM_SUCCESS;
+    }
 
-	/* disconnect from LDAP */
-	rc = ldap_unbind_ext(ld, NULL, NULL);
-	if (rc != LDAP_SUCCESS) return rc;
-
-	return PAM_SUCCESS;
+	return PAM_PERM_DENIED;
 }
