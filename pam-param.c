@@ -147,14 +147,15 @@ void complete_ldap_query (ldap_query q, char *a, char *b) {
 int is_super_admin (LDAP *ld) {
     char *user_dn;
     int rc;
-    ldap_query q = cfg.user;
+    ldap_query q = cfg.admin;
+	LDAPMessage *res;
 
-    rc = get_dn(ld, q, user_dn);
+    rc = get_dn(ld, cfg.user, user_dn);
     if (rc !=0 ) return rc;
     complete_ldap_query (q, user_dn);
 
 	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, LDAP_NO_ATTRS, 1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
-    if (ldap_count_entries != 1) return LDAP_INAPPROPRIATE_AUTH;
+    if (ldap_count_entries(ld, res) != 1) return LDAP_INAPPROPRIATE_AUTH;
 
     ldap_mem_free(user_dn);
     return 1;
@@ -186,7 +187,12 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	if (rc != LDAP_SUCCESS) return rc;
 
 	/* check if is super admin */
-    if (is_super_admin(ld)) return PAM_SUCCESS;
+    if (is_super_admin(ld)) {
+        /* disconnect from LDAP */
+        rc = ldap_unbind_ext(ld, NULL, NULL);
+        if (rc != LDAP_SUCCESS) return rc;
+        return PAM_SUCCESS;
+    }
 
     /* get hostname from pam*/
 	rc = gethostname(host_name, HOST_NAME_MAX);
