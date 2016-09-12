@@ -159,7 +159,7 @@ int is_super_admin (LDAP *ld) {
 	LDAPMessage *res;
 
     rc = get_dn(ld, cfg.user, user_dn);
-    if (rc !=TRUE) {
+    if (rc != TRUE) {
         result = ERROR;
         goto end;
     }
@@ -181,30 +181,47 @@ int is_super_admin (LDAP *ld) {
     end:
         if (user_dn) ldap_mem_free(user_dn);
         return result;
-
-
 }
 
 /*returns 1 if user is permitted*/
 int user_permitted (LDAP *ld) {
-    char *user_dn;
-    char *host_dn;
+    char *user_dn = NULL;
+    char *host_dn = NULL;
     int rc;
+    int count;
+    int result;
     ldap_query q = cfg.membership;
     LDAPMessage *res;
 
     rc = get_dn(ld, cfg.user, user_dn);
-    if (rc !=0 ) return rc;
+    if (rc != TRUE) {
+        result = ERROR;
+        goto end;
+    }
     rc = get_dn(ld, cfg.host, host_dn);
-    if (rc !=0 ) return rc;
+    if (rc != TRUE) {
+        result = ERROR;
+        goto end;
+    }
     complete_ldap_query (q, user_dn, host_dn);
 
 	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, LDAP_NO_ATTRS, 1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
-    if (ldap_count_entries(ld, res) != 1) return LDAP_INAPPROPRIATE_AUTH;
+    if (rc != LDAP_SUCCESS) {
+        result = ERROR;
+        goto end;
+    }
 
-    ldap_mem_free(user_dn);
-    ldap_mem_free(host_dn);
-    return 1;
+    count = ldap_count_entries(ld, res);
+    switch(count){
+        case 0: result=FALSE; goto end;
+        case 1: result=TRUE; goto end;
+        default: result = ERROR; goto end;
+    }
+
+    end:
+       if (user_dn) ldap_mem_free(user_dn);
+       if (host_dn) ldap_mem_free(host_dn);
+       return result;
 }
 
 int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv) {
