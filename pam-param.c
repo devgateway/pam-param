@@ -1,7 +1,4 @@
 #define _XOPEN_SOURCE 700
-#define TRUE 1
-#define FALSE 0
-#define ERROR -1
 
 #include <limits.h>
 #include <unistd.h>
@@ -12,6 +9,10 @@
 
 #include "pam-param.h"
 #include "inih/ini.h"
+
+#define TRUE 1
+#define FALSE 0
+#define ERROR -1
 
 config cfg;
 
@@ -49,16 +50,13 @@ char *ldap_escape_filter(const char *filter) {
 	result[p++] = '\0';
 }
 
-/* handler for ini parser */
+/* callback for ini parser */
 int handler(void *user, const char *section, const char *name, const char *value) {
-
-	#define SECTION(s) strcmp(s,section)==0
-	#define NAME(n) strcmp(n,name)==0
+	#define SECTION(s) strcmp(s,section) == 0
+	#define NAME(n) strcmp(n,name) == 0
 
 	if (SECTION("")) {
-		if (NAME("short_name")) {
-			cfg.short_name = atoi(value);
-		}
+		if (NAME("short_name")) cfg.short_name = atoi(value);
 	} else if (SECTION("ldap")) {
 		if (NAME("uri")) {
 			cfg.ldap_uri = strdup(value);
@@ -97,11 +95,7 @@ int handler(void *user, const char *section, const char *name, const char *value
 	return 1;
 }
 
-/* return object count or LDAP_FAIL */
-int count_entries(LDAP *ld, const ldap_query *query) {
-}
-
-/* get short hostname */
+/* remove domain parts from hostname */
 void shorten_name(char *host_name, int len) {
 	char *c;
 	for (c = host_name; c < host_name + len; c++) {
@@ -112,22 +106,23 @@ void shorten_name(char *host_name, int len) {
 	}
 }
 
-int get_dn(LDAP *ld, ldap_query q, char *dn) {
-
+/* runs an LDAP query, and returns the DN of a single result;
+ * fails if more than one result found (collision) */
+int get_single_dn(LDAP *ld, ldap_query q, char *dn) {
 	int rc;
 	LDAPMessage *res;
 	LDAPMessage *ent;
 
 	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, LDAP_NO_ATTRS, 1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
-    if (ldap_count_entries(ld, res) != 1) {
-        free(res);
-        return ERROR;
-    }
+	if (ldap_count_entries(ld, res) != 1) {
+		free(res);
+		return ERROR;
+	}
 	ent = ldap_first_entry(ld,res);
 	dn = ldap_get_dn(ld, ent);
 
 	free(res);
-    return TRUE;
+	return TRUE;
 }
 
 void complete_ldap_query (ldap_query q, char *a, char *b) {
