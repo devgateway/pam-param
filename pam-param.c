@@ -111,10 +111,11 @@ void shorten_name(char *host_name, int len) {
 char *get_single_dn(LDAP *ld, ldap_query q) {
 	int rc;
 	char *dn = NULL;
-	LDAPMessage *res;
+	LDAPMessage *res = NULL;
 	LDAPMessage *first;
 
-	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, LDAP_NO_ATTRS, 1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
+	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, LDAP_NO_ATTRS,
+			1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
 	if (rc != LDAP_SUCCESS) goto end;
 
 	if (ldap_count_entries(ld, res) != 1) goto end;
@@ -123,7 +124,7 @@ char *get_single_dn(LDAP *ld, ldap_query q) {
 	dn = ldap_get_dn(ld, first);
 
 end:
-	ldap_msgfree(res);
+	if (res) ldap_msgfree(res);
 	return dn;
 }
 
@@ -149,7 +150,7 @@ int is_super_admin(LDAP *ld) {
 	char *user_dn;
 	int rc, result = ERROR;
 	ldap_query q = cfg.admin;
-	LDAPMessage *res;
+	LDAPMessage *res = NULL;
 
 	user_dn = get_single_dn(ld, cfg.user);
 	if (!user_dn) goto end;
@@ -167,45 +168,39 @@ int is_super_admin(LDAP *ld) {
 
 end:
 	if (user_dn) ldap_mem_free(user_dn);
+	if (res) ldap_msgfree(res);
 	return result;
 }
 
 /* returns TRUE if user is permitted */
-int user_permitted (LDAP *ld) {
-    char *user_dn = NULL, *host_dn = NULL;
-    int rc, count, result;
-    ldap_query q = cfg.membership;
-    LDAPMessage *res;
+int user_permitted(LDAP *ld) {
+	char *user_dn = NULL, *host_dn = NULL;
+	int rc, count, result = ERROR;
+	ldap_query q = cfg.membership;
+	LDAPMessage *res;
 
-    rc = get_single_dn(ld, cfg.user);
-    if (rc != TRUE) {
-        result = ERROR;
-        goto end;
-    }
-    rc = get_single_dn(ld, cfg.host);
-    if (rc != TRUE) {
-        result = ERROR;
-        goto end;
-    }
-    interpolate_filter (q, user_dn, host_dn);
+	user_dn = get_single_dn(ld, cfg.user);
+	if (!user_dn) goto end;
 
-	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, LDAP_NO_ATTRS, 1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
-    if (rc != LDAP_SUCCESS) {
-        result = ERROR;
-        goto end;
-    }
+	host_dn = get_single_dn(ld, cfg.host);
+	if (!host_dn) goto end;
 
-    count = ldap_count_entries(ld, res);
-    switch(count){
-        case 0: result=FALSE; goto end;
-        case 1: result=TRUE; goto end;
-        default: result = ERROR; goto end;
-    }
+	interpolate_filter(q, user_dn, host_dn);
 
-    end:
-       if (user_dn) ldap_mem_free(user_dn);
-       if (host_dn) ldap_mem_free(host_dn);
-       return result;
+	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, LDAP_NO_ATTRS,
+			1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
+	if (rc != LDAP_SUCCESS) goto end;
+
+	count = ldap_count_entries(ld, res);
+	switch (count) {
+		case 0: result = FALSE; break;
+		case 1: result = TRUE;
+	}
+
+end:
+	if (user_dn) ldap_mem_free(user_dn);
+	if (host_dn) ldap_mem_free(host_dn);
+	return result;
 }
 
 int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv) {
