@@ -143,34 +143,31 @@ void interpolate_filter(ldap_query q, char *a, char *b) {
 	q.filter = filter;
 }
 
-/*returns 1 if user is super admin*/
-int is_super_admin (LDAP *ld) {
-    char *user_dn = NULL;
-    int rc;
-    int count;
-    int result;
-    ldap_query q = cfg.admin;
+/* returns TRUE if user is super admin, FALSE if not,
+ * or ERROR if search failed or collision found */
+int is_super_admin(LDAP *ld) {
+	char *user_dn;
+	int rc, result = ERROR;
+	ldap_query q = cfg.admin;
 	LDAPMessage *res;
 
 	user_dn = get_single_dn(ld, cfg.user);
 	if (!user_dn) goto end;
 
-	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, LDAP_NO_ATTRS, 1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
-    if (rc != LDAP_SUCCESS ) {
-        result = ERROR;
-        goto end;
-    }
+	interpolate_filter(q, user_dn);
 
-    count = ldap_count_entries(ld, res);
-    switch(count){
-        case 0: result = FALSE; goto end;
-        case 1: result = TRUE; goto end;
-        default: result = ERROR; goto end;
-    }
+	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, LDAP_NO_ATTRS,
+			1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
+	if (rc != LDAP_SUCCESS) goto end;
 
-    end:
-        if (user_dn) ldap_mem_free(user_dn);
-        return result;
+	switch ( ldap_count_entries(ld, res) ) {
+		case 0:  result = FALSE; break;
+		case 1:  result = TRUE;
+	}
+
+end:
+	if (user_dn) ldap_mem_free(user_dn);
+	return result;
 }
 
 /*returns 1 if user is permitted*/
