@@ -108,21 +108,23 @@ void shorten_name(char *host_name, int len) {
 
 /* runs an LDAP query, and returns the DN of a single result;
  * fails if more than one result found (collision) */
-int get_single_dn(LDAP *ld, ldap_query q, char *dn) {
+char *get_single_dn(LDAP *ld, ldap_query q) {
 	int rc;
+	char *dn = NULL;
 	LDAPMessage *res;
-	LDAPMessage *ent;
+	LDAPMessage *first;
 
 	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, LDAP_NO_ATTRS, 1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
-	if (ldap_count_entries(ld, res) != 1) {
-		free(res);
-		return ERROR;
-	}
-	ent = ldap_first_entry(ld,res);
-	dn = ldap_get_dn(ld, ent);
+	if (rc != LDAP_SUCCESS) goto end;
 
-	free(res);
-	return TRUE;
+	if (ldap_count_entries(ld, res) != 1) goto end;
+
+	first = ldap_first_entry(ld, res);
+	dn = ldap_get_dn(ld, first);
+
+end:
+	ldap_msgfree(res);
+	return dn;
 }
 
 /* printf arguments into LDAP filter */
@@ -150,12 +152,8 @@ int is_super_admin (LDAP *ld) {
     ldap_query q = cfg.admin;
 	LDAPMessage *res;
 
-    rc = get_dn(ld, cfg.user, user_dn);
-    if (rc != TRUE) {
-        result = ERROR;
-        goto end;
-    }
-    complete_ldap_query (q, user_dn);
+	user_dn = get_single_dn(ld, cfg.user);
+	if (!user_dn) goto end;
 
 	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, LDAP_NO_ATTRS, 1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
     if (rc != LDAP_SUCCESS ) {
@@ -177,20 +175,17 @@ int is_super_admin (LDAP *ld) {
 
 /*returns 1 if user is permitted*/
 int user_permitted (LDAP *ld) {
-    char *user_dn = NULL;
-    char *host_dn = NULL;
-    int rc;
-    int count;
-    int result;
+    char *user_dn = NULL, *host_dn = NULL;
+    int rc, count, result;
     ldap_query q = cfg.membership;
     LDAPMessage *res;
 
-    rc = get_dn(ld, cfg.user, user_dn);
+    rc = get_single_dn(ld, cfg.user);
     if (rc != TRUE) {
         result = ERROR;
         goto end;
     }
-    rc = get_dn(ld, cfg.host, host_dn);
+    rc = get_single_dn(ld, cfg.host);
     if (rc != TRUE) {
         result = ERROR;
         goto end;
