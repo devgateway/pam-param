@@ -125,23 +125,20 @@ int get_single_dn(LDAP *ld, ldap_query q, char *dn) {
 	return TRUE;
 }
 
-void complete_ldap_query (ldap_query q, char *a, char *b) {
-    char *res;
-    size_t full_length;
-    full_len = strlen(q.filter) + 1;
+/* printf arguments into LDAP filter */
+void interpolate_filter(ldap_query q, char *a, char *b) {
+	char *filter;
+	size_t len;
 
-    if (!a && !b) return;
-    if (a) {
-       full_len = full_len - 2 + strlen(a);
-    }
-    if (b) {
-       full_len = full_len - 2 + strlen(b);
-    }
+	len = strlen(q.filter);
 
-    res = (char *)malloc(full_len * sizeof(char));
-    snprintf(res, full_len, q.filter, a, b);
-    free(q.filter);
-    q.filter = res;
+	if (a) len += strlen(a);
+	if (b) len += strlen(b);
+
+	filter = (char *) malloc(++len);
+	snprintf(filter, len, q.filter, a, b);
+	free(q.filter);
+	q.filter = filter;
 }
 
 /*returns 1 if user is super admin*/
