@@ -170,7 +170,7 @@ end:
 	return result;
 }
 
-/*returns 1 if user is permitted*/
+/* returns TRUE if user is permitted */
 int user_permitted (LDAP *ld) {
     char *user_dn = NULL, *host_dn = NULL;
     int rc, count, result;
@@ -187,7 +187,7 @@ int user_permitted (LDAP *ld) {
         result = ERROR;
         goto end;
     }
-    complete_ldap_query (q, user_dn, host_dn);
+    interpolate_filter (q, user_dn, host_dn);
 
 	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, LDAP_NO_ATTRS, 1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
     if (rc != LDAP_SUCCESS) {
@@ -220,7 +220,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	/* get user name from PAM */
 	rc = pam_get_user(pamh, user_name, NULL);
 	if (rc != PAM_SUCCESS) return rc;
-    complete_ldap_query(cfg.user,&user_name);
+    interpolate_filter(cfg.user,&user_name);
 
 	/* connect to LDAP */
 	rc = ldap_initialize(&ld, cfg.ldap_uri);
@@ -245,7 +245,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	rc = gethostname(host_name, HOST_NAME_MAX);
 	if (rc) return PAM_AUTH_ERR;
 	if (cfg.short_name) shorten_name(host_name, HOST_NAME_MAX);
-    complete_ldap_query(cfg.host,host_name);
+    interpolate_filter(cfg.host,host_name);
 
 	/* check if access permitted */
     if (user_permitted(ld)) {
