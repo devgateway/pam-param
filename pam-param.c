@@ -208,47 +208,49 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	char host_name[HOST_NAME_MAX];
 	const char **user_name;
 	LDAP *ld;
+	struct berval cred;
+	int result = PAM_AUTH_ERR;
 
 	rc = ini_parse(CONFIG_FILE, handler, NULL);
 	if (rc) return PAM_AUTH_ERR;
 
 	/* get user name from PAM */
 	rc = pam_get_user(pamh, user_name, NULL);
-	if (rc != PAM_SUCCESS) return rc;
-    interpolate_filter(cfg.user,&user_name);
+	if (rc != PAM_SUCCESS) return PAM_AUTH_ERR;
 
 	/* connect to LDAP */
 	rc = ldap_initialize(&ld, cfg.ldap_uri);
-	if (rc != LDAP_SUCCESS) return rc;
+	if (rc != LDAP_SUCCESS) return PAM_AUTH_ERR;
 
-	struct berval cred;
 	cred.bv_val = cfg.ldap_pw;
 	cred.bv_len = strlen(cfg.ldap_pw);
 
 	rc = ldap_sasl_bind_s(ld, cfg.ldap_dn, LDAP_SASL_SIMPLE, &cred, NULL, NULL, NULL);
-	if (rc != LDAP_SUCCESS) return rc;
+	if (rc != LDAP_SUCCESS) return PAM_AUTH_ERR;
+
+	interpolate_filter(cfg.user, *user_name);
 
 	/* check if is super admin */
-    if (is_super_admin(ld)) {
-        /* disconnect from LDAP */
-        rc = ldap_unbind_ext(ld, NULL, NULL);
-        if (rc != LDAP_SUCCESS) return rc;
-        return PAM_SUCCESS;
-    }
+	switch ( is_super_admin(ld) ) {
+		case TRUE:  result = PAM_SUCCESS; goto end_ldap;
+		case ERROR: goto end_ldap;
+	}
 
-    /* get hostname from pam*/
+	/* get host name */
 	rc = gethostname(host_name, HOST_NAME_MAX);
-	if (rc) return PAM_AUTH_ERR;
+	if (rc) goto end_ldap;
+
 	if (cfg.short_name) shorten_name(host_name, HOST_NAME_MAX);
-    interpolate_filter(cfg.host,host_name);
+
+	interpolate_filter(cfg.host, host_name);
 
 	/* check if access permitted */
-    if (user_permitted(ld)) {
-        /* disconnect from LDAP */
-        rc = ldap_unbind_ext(ld, NULL, NULL);
-        if (rc != LDAP_SUCCESS) return rc;
-        return PAM_SUCCESS;
-    }
+	switch ( user_permitted(ld) ) {
+		case TRUE:  result = PAM_SUCCESS; break;
+		case FALSE: result = PAM_PERM_DENIED;
+	}
 
-	return PAM_PERM_DENIED;
+end_ldap:
+	ldap_unbind_ext(ld, NULL, NULL);
+	return result;
 }
