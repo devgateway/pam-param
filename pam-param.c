@@ -15,6 +15,7 @@
 #define ERROR -1
 
 config cfg;
+char *no_attrs[] = { LDAP_NO_ATTRS, NULL };
 
 char *ldap_escape_filter(const char *filter) {
 	char map[256] = {0};
@@ -114,7 +115,7 @@ char *get_single_dn(LDAP *ld, ldap_query q) {
 	LDAPMessage *res = NULL;
 	LDAPMessage *first;
 
-	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, LDAP_NO_ATTRS,
+	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, no_attrs,
 			1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
 	if (rc != LDAP_SUCCESS) goto end;
 
@@ -157,7 +158,7 @@ int is_super_admin(LDAP *ld) {
 
 	interpolate_filter(q, user_dn);
 
-	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, LDAP_NO_ATTRS,
+	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, no_attrs,
 			1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
 	if (rc != LDAP_SUCCESS) goto end;
 
@@ -187,7 +188,7 @@ int user_permitted(LDAP *ld) {
 
 	interpolate_filter(q, user_dn, host_dn);
 
-	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, LDAP_NO_ATTRS,
+	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, no_attrs,
 			1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
 	if (rc != LDAP_SUCCESS) goto end;
 
