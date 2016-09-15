@@ -130,7 +130,7 @@ end:
 }
 
 /* printf arguments into LDAP filter */
-void interpolate_filter(ldap_query q, char *a, char *b) {
+void interpolate_filter(ldap_query q, const char *a, const char *b) {
 	char *filter;
 	size_t len;
 
@@ -156,7 +156,7 @@ int is_super_admin(LDAP *ld) {
 	user_dn = get_single_dn(ld, cfg.user);
 	if (!user_dn) goto end;
 
-	interpolate_filter(q, user_dn);
+	interpolate_filter(q, user_dn, NULL);
 
 	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, no_attrs,
 			1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
@@ -168,7 +168,7 @@ int is_super_admin(LDAP *ld) {
 	}
 
 end:
-	if (user_dn) ldap_mem_free(user_dn);
+	if (user_dn) ldap_memfree(user_dn);
 	if (res) ldap_msgfree(res);
 	return result;
 }
@@ -199,8 +199,8 @@ int user_permitted(LDAP *ld) {
 	}
 
 end:
-	if (user_dn) ldap_mem_free(user_dn);
-	if (host_dn) ldap_mem_free(host_dn);
+	if (user_dn) ldap_memfree(user_dn);
+	if (host_dn) ldap_memfree(host_dn);
 	return result;
 }
 
@@ -229,7 +229,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	rc = ldap_sasl_bind_s(ld, cfg.ldap_dn, LDAP_SASL_SIMPLE, &cred, NULL, NULL, NULL);
 	if (rc != LDAP_SUCCESS) return PAM_AUTH_ERR;
 
-	interpolate_filter(cfg.user, *user_name);
+	interpolate_filter(cfg.user, *user_name, NULL);
 
 	/* check if is super admin */
 	switch ( is_super_admin(ld) ) {
@@ -243,7 +243,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 
 	if (cfg.short_name) shorten_name(host_name, HOST_NAME_MAX);
 
-	interpolate_filter(cfg.host, host_name);
+	interpolate_filter(cfg.host, host_name, NULL);
 
 	/* check if access permitted */
 	switch ( user_permitted(ld) ) {
