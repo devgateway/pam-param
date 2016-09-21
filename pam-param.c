@@ -7,6 +7,7 @@
 #include <ldap.h>
 #include <lber.h>
 #include <syslog.h>
+#include <pam_ext.h>
 
 #include "pam-param.h"
 #include "inih/ini.h"
@@ -140,13 +141,25 @@ int get_single_dn(LDAP *ld, ldap_query q, char **dn) {
 
 	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, no_attrs,
 			1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
-	if (rc != LDAP_SUCCESS) goto end;
+	if (rc != LDAP_SUCCESS) {
+		LOG(LOG_ERR, "LDAP search '%s' failed: %s",
+				q.filter, ldap_err2string(rc));
+		goto end;
+	}
 
 	n_items = ldap_count_entries(ld, res);
 
-	if (n_items == 1) {
-		first = ldap_first_entry(ld, res);
-		*dn = ldap_get_dn(ld, first);
+	switch (n_items) {
+		case 0:
+			LOG(LOG_DEBUG, "LDAP search '%s' found no entries.", q.filter);
+			break;
+		case 1:
+			LOG(LOG_DEBUG, "LDAP search '%s' found 1 entry.", q.filter);
+			first = ldap_first_entry(ld, res);
+			*dn = ldap_get_dn(ld, first);
+			break;
+		default:
+			LOG(LOG_WARNING, "LDAP search '%s' found %i entries.", q.filter, n_items);
 	}
 
 end:
@@ -168,6 +181,7 @@ void interpolate_filter(ldap_query q, const char *a, const char *b) {
 	snprintf(filter, len, q.filter, a, b);
 	free(q.filter);
 	q.filter = filter;
+	LOG(LOG_DEBUG, "Interpolated search filter '%s'", filter);
 }
 
 /* returns:
@@ -175,23 +189,20 @@ void interpolate_filter(ldap_query q, const char *a, const char *b) {
  * PAM_IGNORE if not;
  * PAM_USER_UNKNOWN if user DN not found;
  * PAM_AUTH_ERR if search failed or collision found */
-int is_super_admin(LDAP *ld) {
-	char *user_dn = NULL;
+int is_super_admin(LDAP *ld, char *user_dn) {
 	int rc, result = PAM_AUTH_ERR;
 	ldap_query q = cfg.admin;
 	LDAPMessage *res = NULL;
-
-	rc = get_single_dn(ld, cfg.user, &user_dn);
-	if (rc != 1) {
-		result = rc ? PAM_AUTH_ERR : PAM_USER_UNKNOWN;
-		goto end;
-	}
 
 	interpolate_filter(q, user_dn, NULL);
 
 	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, no_attrs,
 			1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
-	if (rc != LDAP_SUCCESS) goto end;
+	if (rc != LDAP_SUCCESS) {
+		LOG(LOG_ERR, "LDAP search '%s' failed: %s",
+				q.filter, ldap_err2string(rc));
+		goto end;
+	}
 
 	result = ldap_count_entries(ld, res) ? PAM_SUCCESS : PAM_IGNORE;
 
@@ -204,19 +215,12 @@ end:
 /* returns:
  * PAM_SUCCESS if user is permitted;
  * PAM_PERM_DENIED if not;
- * PAM_USER_UNKNOWN if user DN not found;
  * PAM_AUTH_ERR if search failed or collision found */
-int user_permitted(LDAP *ld) {
-	char *user_dn = NULL, *host_dn = NULL;
+int user_permitted(LDAP *ld, char *user_dn) {
+	char *host_dn = NULL;
 	int rc, count, result = PAM_AUTH_ERR;
 	ldap_query q = cfg.membership;
 	LDAPMessage *res;
-
-	rc = get_single_dn(ld, cfg.user, &user_dn);
-	if (rc != 1) {
-		result = rc ? PAM_AUTH_ERR : PAM_USER_UNKNOWN;
-		goto end;
-	}
 
 	rc = get_single_dn(ld, cfg.host, &host_dn);
 	if (rc != 1) {
@@ -228,7 +232,11 @@ int user_permitted(LDAP *ld) {
 
 	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, no_attrs,
 			1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
-	if (rc != LDAP_SUCCESS) goto end;
+	if (rc != LDAP_SUCCESS) {
+		LOG(LOG_ERR, "LDAP search '%s' failed: %s",
+				q.filter, ldap_err2string(rc));
+		goto end;
+	}
 
 	result = ldap_count_entries(ld, res) ? PAM_SUCCESS : PAM_PERM_DENIED;
 
@@ -241,6 +249,7 @@ end:
 int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv) {
 	char host_name[HOST_NAME_MAX];
 	const char **user_name;
+	char *user_dn;
 	LDAP *ld;
 	struct berval cred;
 	int result = PAM_AUTH_ERR, rc, i;
@@ -272,30 +281,57 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	if (rc != LDAP_SUCCESS) return PAM_AUTH_ERR;
 
 	interpolate_filter(cfg.user, *user_name, NULL);
+	rc = get_single_dn(ld, cfg.user, &user_dn);
+	if (rc != 1) {
+		if (rc) {
+			LOG(LOG_ERR, "Multiple DN found for %s", cfg.user);
+			result = PAM_AUTH_ERR;
+		} else {
+			LOG(LOG_WARNING, "Unable to find the DN for %s", cfg.user);
+			result = PAM_USER_UNKNOWN;
+		}
+		goto end_ldap;
+	}
 
 	/* check if is super admin */
-	result = is_super_admin(ld);
+	result = is_super_admin(ld, user_dn);
 	switch (result) {
 		case PAM_SUCCESS:
+			LOG(LOG_DEBUG, "%s is a super admin", cfg.user);
 			goto end_ldap;
-		case PAM_USER_UNKNOWN:
 		case PAM_AUTH_ERR:
+			LOG(LOG_ERR, "Failed to test if %s is a super admin", cfg.user);
 			goto end_ldap;
 	}
 
 	/* get host name */
 	rc = gethostname(host_name, HOST_NAME_MAX);
 	if (rc) {
+		LOG(LOG_ERR, "Unable to determine host name");
 		result = PAM_AUTH_ERR;
 		goto end_ldap;
 	}
 
-	if (cfg.short_name) shorten_name(host_name, HOST_NAME_MAX);
+	if (cfg.short_name) {
+		shorten_name(host_name, HOST_NAME_MAX);
+		LOG(LOG_DEBUG, "Short host name is %s", host_name);
+	}
 
 	interpolate_filter(cfg.host, host_name, NULL);
 
 	/* check if access permitted */
-	result = user_permitted(ld);
+	result = user_permitted(ld, user_dn);
+
+	switch (result) {
+		case PAM_SUCCESS:
+			LOG(LOG_DEBUG, "%s is permitted on %s", cfg.user, host_name);
+			break;
+		case PAM_PERM_DENIED:
+			LOG(LOG_WARNING, "%s is not permitted on %s", cfg.user, host_name);
+			break;
+		case PAM_AUTH_ERR:
+			LOG(LOG_ERR, "Failed to test if %s is permitted on %s", cfg.user, host_name);
+	}
 
 end_ldap:
 	ldap_unbind_ext(ld, NULL, NULL);
