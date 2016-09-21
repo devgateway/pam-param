@@ -6,13 +6,39 @@
 #include <sys/types.h>
 #include <ldap.h>
 #include <lber.h>
+#include <syslog.h>
 
 #include "pam-param.h"
 #include "inih/ini.h"
 
+#ifdef __GNUC__
+#define LOG(level, fmt, args...) \
+	do { \
+		if (level < log_level) break; \
+		if (level == LOG_DEBUG) { \
+			pam_syslog(pam, LOG_DEBUG, "%s:%i " fmt, \
+					__FUNCTION__, __LINE__ , ## args); \
+		} else { \
+			pam_syslog(pam, level, fmt , ## args); \
+		} \
+	} while (0)
+#else
+#define LOG(level, fmt, ...) \
+	do { \
+		if (level < log_level) break; \
+		if (level == LOG_DEBUG) { \
+			pam_syslog(pam, LOG_DEBUG, "%s:%i " fmt, \
+					__FUNCTION__, __LINE__ , __VA_ARGS__); \
+		} else { \
+			pam_syslog(pam, level, fmt , __VA_ARGS__); \
+		} \
+	} while (0)
+#endif /* __GNUC__ */
 
 config cfg;
 char *no_attrs[] = { LDAP_NO_ATTRS, NULL };
+int log_level = LOG_WARNING;
+pam_handle_t *pam = NULL;
 
 char *ldap_escape_filter(const char *filter) {
 	char map[256] = {0};
@@ -167,7 +193,7 @@ int is_super_admin(LDAP *ld) {
 			1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
 	if (rc != LDAP_SUCCESS) goto end;
 
-	result = ldap_count_entries(ld, res) ? PAM_SUCCESS : PAM_PERM_DENIED;
+	result = ldap_count_entries(ld, res) ? PAM_SUCCESS : PAM_IGNORE;
 
 end:
 	if (user_dn) ldap_memfree(user_dn);
@@ -192,7 +218,7 @@ int user_permitted(LDAP *ld) {
 		goto end;
 	}
 
-	rc = get_single_dn(ld, cfg.host, host_dn);
+	rc = get_single_dn(ld, cfg.host, &host_dn);
 	if (rc != 1) {
 		result = PAM_AUTH_ERR;
 		goto end;
@@ -204,7 +230,7 @@ int user_permitted(LDAP *ld) {
 			1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
 	if (rc != LDAP_SUCCESS) goto end;
 
-	result = ldap_count_entries(ld, res) ? PAM_SUCCESS : PAM_IGNORE;
+	result = ldap_count_entries(ld, res) ? PAM_SUCCESS : PAM_PERM_DENIED;
 
 end:
 	if (user_dn) ldap_memfree(user_dn);
@@ -213,12 +239,20 @@ end:
 }
 
 int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv) {
-	int rc;
 	char host_name[HOST_NAME_MAX];
 	const char **user_name;
 	LDAP *ld;
 	struct berval cred;
-	int result = PAM_AUTH_ERR;
+	int result = PAM_AUTH_ERR, rc, i;
+
+	pam = pamh;
+
+	for (i = 0; i < argc; i++) {
+		if (!strcmp(argv[i], "debug")) {
+			log_level = LOG_DEBUG;
+			break;
+		}
+	}
 
 	rc = ini_parse(CONFIG_FILE, handler, NULL);
 	if (rc) return PAM_AUTH_ERR;
