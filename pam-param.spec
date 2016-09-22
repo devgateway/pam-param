@@ -22,10 +22,13 @@ accounts which will have access to any host.
 %setup -n %name
 
 %build
-%__cmake .
+%__cmake \
+	-DMODULEDIR:PATH=%{_pamlibdir} \
+	.
 %__make
 
 %install
+%__make DESTDIR=%_buildrootdir install
 
 %files
 
