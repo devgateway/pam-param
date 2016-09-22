@@ -1,12 +1,17 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <pam_appl.h>
 
-#define FAIL 1
-#define PASS 0
+#ifndef SERVICE_NAME
+#define SERVICE_NAME "pam-param-test"
+#endif
 
-int main(int argc, const char *argv[]) { 
-	if (argc != 2) {
-		fprintf(stderr, "One argument required: user name.\n");
-		return FAIL;
+int main() {
+	char username[32 + 1];
+	int rc;
+
+	for (;;) {
+		printf("Enter user name: ");
+		if ( scanf("%32s", &username) != 1 ) return 1;
 	}
 }
