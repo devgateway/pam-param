@@ -7,7 +7,6 @@ Source:         %name.tgz
 BuildRequires:  cmake >= 2.8
 
 %define _pamlibdir %{_libdir}
-%define _moduledir %{_libdir}/security
 %define _secconfdir %{_sysconfdir}/security
 %define _pamconfdir %{_sysconfdir}/pam.d
 
@@ -22,10 +21,16 @@ accounts which will have access to any host.
 %setup -n %name
 
 %build
-%__cmake .
+%__cmake \
+	-DMODULEDIR:PATH=%{_pamlibdir} \
+	-DLIBEXECDIR:PATH=%_libexecdir \
+	-DSECCONFDIR:PATH=%{_secconfdir} \
+	-DPAMCONFDIR:PATH=%{_pamconfdir} \
+	.
 %__make
 
 %install
+%__make DESTDIR=%_buildrootdir install
 
 %files
 
