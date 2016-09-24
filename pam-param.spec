@@ -1,5 +1,6 @@
 Name:           pam_param
 Version:        0.1
+Release:        1
 License:        GPLv3
 Vendor:         Development Gateway
 Summary:        PAM module for configurable LDAP account lookups
