@@ -17,7 +17,7 @@ target_include_directories(authtest PRIVATE ${PAM_INCLUDE})
 target_link_libraries(authtest pam)
 
 set(MODULEDIR /usr/lib/security CACHE PATH "PAM module path")
-set(LIBEXECDIR /usr/libexec CACHE PATH "Supplemental binary path")
+set(SBINDIR /usr/sbin CACHE PATH "Privileged user binary path")
 set(SECCONFDIR /etc/security CACHE PATH "Security config path")
 set(PAMCONFDIR /etc/pam.d CACHE PATH "PAM config path")
 
@@ -25,7 +25,7 @@ install(TARGETS pam_param LIBRARY
 	DESTINATION "${MODULEDIR}"
 	NAMELINK_ONLY)
 install(TARGETS authtest RUNTIME
-	DESTINATION "${LIBEXECDIR}/${CMAKE_PROJECT_NAME}")
+	DESTINATION "${SBINDIR}")
 install(FILES "samples/pam-param.ini"
 	DESTINATION "${SECCONFDIR}"
 	PERMISSIONS OWNER_WRITE OWNER_READ)

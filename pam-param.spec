@@ -26,7 +26,7 @@ accounts which will have access to any host.
 %build
 %__cmake \
 	-DMODULEDIR:PATH=%{_pamlibdir} \
-	-DLIBEXECDIR:PATH=%_libexecdir \
+	-DSBINDIR:PATH=%_sbindir \
 	-DSECCONFDIR:PATH=%{_secconfdir} \
 	-DPAMCONFDIR:PATH=%{_pamconfdir} \
 	.
