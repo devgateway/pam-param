@@ -21,11 +21,10 @@ set(SBINDIR    /usr/sbin          CACHE PATH "Privileged user binary path")
 set(SECCONFDIR /etc/security      CACHE PATH "Security config path")
 set(PAMCONFDIR /etc/pam.d         CACHE PATH "PAM config path")
 
-install(TARGETS pam_param LIBRARY
-	DESTINATION "${MODULEDIR}"
+install(TARGETS pam_param pam_param_test
+	RUNTIME DESTINATION "${SBINDIR}"
+	LIBRARY DESTINATION "${MODULEDIR}"
 	NAMELINK_SKIP)
-install(TARGETS pam_param_test RUNTIME
-	DESTINATION "${SBINDIR}")
 install(FILES "samples/pam_param.ini"
 	DESTINATION "${SECCONFDIR}"
 	PERMISSIONS OWNER_WRITE OWNER_READ)

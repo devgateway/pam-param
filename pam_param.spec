@@ -22,7 +22,7 @@ accounts which will have access to any host.
 %description test
 Account facility test utility for %name PAM module.
 
-%define _pamlibdir %{_libdir}
+%define _moduledir %{_libdir}/security
 %define _secconfdir %{_sysconfdir}/security
 %define _pamconfdir %{_sysconfdir}/pam.d
 
@@ -32,7 +32,7 @@ Account facility test utility for %name PAM module.
 
 %build
 cmake \
-	-DMODULEDIR:PATH=%{_pamlibdir} \
+	-DMODULEDIR:PATH=%{_moduledir} \
 	-DSBINDIR:PATH=%_sbindir \
 	-DSECCONFDIR:PATH=%{_secconfdir} \
 	-DPAMCONFDIR:PATH=%{_pamconfdir} \
@@ -43,7 +43,7 @@ make
 make DESTDIR=%buildroot install
 
 %files
-%{_pamlibdir}/*
+%{_moduledir}/*
 %config %attr(0600,-,-) %{_secconfdir}/%name.ini
 
 %files test
