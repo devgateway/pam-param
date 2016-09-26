@@ -23,7 +23,7 @@ set(PAMCONFDIR /etc/pam.d         CACHE PATH "PAM config path")
 
 install(TARGETS pam_param LIBRARY
 	DESTINATION "${MODULEDIR}"
-	NAMELINK_ONLY)
+	NAMELINK_SKIP)
 install(TARGETS pam_param_test RUNTIME
 	DESTINATION "${SBINDIR}")
 install(FILES "samples/pam_param.ini"
