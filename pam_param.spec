@@ -39,7 +39,7 @@ cmake \
 make
 
 %install
-make DESTDIR=%_buildrootdir install
+make DESTDIR=%_buildroot install
 
 %files
 %{_pamlibdir}
