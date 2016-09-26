@@ -3,7 +3,7 @@
 #include <pam_appl.h>
 
 #ifndef SERVICE_NAME
-#define SERVICE_NAME "pam-param-test"
+#define SERVICE_NAME "pam_param_test"
 #endif
 
 int main() {

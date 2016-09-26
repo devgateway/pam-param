@@ -9,7 +9,7 @@
 #include <syslog.h>
 #include <pam_ext.h>
 
-#include "pam-param.h"
+#include "pam_param.h"
 #include "inih/ini.h"
 
 #ifdef __GNUC__
