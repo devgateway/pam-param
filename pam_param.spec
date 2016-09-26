@@ -6,7 +6,7 @@ Vendor:         Development Gateway
 Summary:        PAM module for configurable LDAP account lookups
 Source:         %name.zip
 Source1:        inih.zip
-#BuildRequires:  cmake >= 2.8
+BuildRequires:  cmake >= 2.8.11
 
 %package test
 Summary:        Test utility for %name PAM module
@@ -42,11 +42,11 @@ make
 make DESTDIR=%buildroot install
 
 %files
-%{_pamlibdir}
+%{_pamlibdir}/*
 %config %attr(0600,-,-) %{_secconfdir}/%name.ini
 
 %files test
-%_sbindir
+%_sbindir/*
 %config %{_pamconfdir}/%{name}_test
 
 %clean
