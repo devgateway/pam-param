@@ -10,6 +10,7 @@ BuildRequires:  cmake >= 2.8.11
 
 %package test
 Summary:        Test utility for %name PAM module
+Requires:				%name
 
 %description
 This PAM module provides account service using configurable LDAP lookups. It's
