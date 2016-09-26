@@ -4,8 +4,9 @@ Release:        1
 License:        GPLv3
 Vendor:         Development Gateway
 Summary:        PAM module for configurable LDAP account lookups
-Source:         %name.tgz
-BuildRequires:  cmake >= 2.8
+Source:         %name.zip
+Source1:        inih.zip
+BuildRequires:  cmake >= 2.8, cc
 
 %define _pamlibdir %{_libdir}
 %define _secconfdir %{_sysconfdir}/security
@@ -20,6 +21,7 @@ accounts which will have access to any host.
 
 %prep
 %setup -n %name
+%setup -D -T -a 1 -n %name
 
 %build
 %__cmake \
