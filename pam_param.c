@@ -17,10 +17,10 @@
 	do { \
 		if (level < log_level) break; \
 		if (level == LOG_DEBUG) { \
-			pam_syslog(pam, LOG_DEBUG, "%s:%i " fmt, \
+			pam_syslog(pam, LOG_AUTHPRIV | LOG_DEBUG, "%s:%i " fmt, \
 					__FUNCTION__, __LINE__ , ## args); \
 		} else { \
-			pam_syslog(pam, level, fmt , ## args); \
+			pam_syslog(pam, LOG_AUTHPRIV | level, fmt , ## args); \
 		} \
 	} while (0)
 #else
@@ -28,10 +28,10 @@
 	do { \
 		if (level < log_level) break; \
 		if (level == LOG_DEBUG) { \
-			pam_syslog(pam, LOG_DEBUG, "%s:%i " fmt, \
+			pam_syslog(pam, LOG_AUTHPRIV | LOG_DEBUG, "%s:%i " fmt, \
 					__FUNCTION__, __LINE__ , __VA_ARGS__); \
 		} else { \
-			pam_syslog(pam, level, fmt , __VA_ARGS__); \
+			pam_syslog(pam, LOG_AUTHPRIV | level, fmt , __VA_ARGS__); \
 		} \
 	} while (0)
 #endif /* __GNUC__ */
