@@ -36,6 +36,7 @@ cmake \
 	-DSBINDIR:PATH=%_sbindir \
 	-DSECCONFDIR:PATH=%{_secconfdir} \
 	-DPAMCONFDIR:PATH=%{_pamconfdir} \
+	-DCMAKE_BUILD_TYPE=RelWithDebInfo \
 	.
 make
 
