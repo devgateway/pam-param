@@ -264,7 +264,10 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	}
 
 	rc = ini_parse(CONFIG_FILE, handler, NULL);
-	if (rc) return PAM_AUTH_ERR;
+	if (rc) {
+		LOG(LOG_CRIT, "Unable to parse ini file");
+		return PAM_AUTH_ERR;
+	}
 
 	/* get user name from PAM */
 	rc = pam_get_user(pamh, user_name, NULL);
