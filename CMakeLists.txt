@@ -10,7 +10,7 @@ set(CONFIGFILE /etc/pam_param.ini CACHE FILE "Module configuration file")
 find_path(PAM_INCLUDE NAMES "pam_modules.h" PATH_SUFFIXES "security" "pam")
 
 add_library(pam_param MODULE pam_param.c)
-target_compile_definitions(pam_param PRIVATE CONFIG_FILE=${CONFIGFILE})
+target_compile_definitions(pam_param PRIVATE CONFIG_FILE="${CONFIGFILE}")
 set_target_properties(pam_param PROPERTIES PREFIX "")
 target_include_directories(pam_param PRIVATE ${PAM_INCLUDE} inih)
 target_link_libraries(pam_param inih ldap pam)
