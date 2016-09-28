@@ -32,7 +32,7 @@ Account facility test utility for %name PAM module.
 
 %build
 cmake \
-	-DCONFIGFILE:FILE=%{_secconfdir}/%name.ini
+	-DCONFIGFILE:FILE=%{_secconfdir}/%name.ini \
 	-DMODULEDIR:PATH=%{_moduledir} \
 	-DSBINDIR:PATH=%_sbindir \
 	-DSECCONFDIR:PATH=%{_secconfdir} \
