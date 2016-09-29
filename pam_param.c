@@ -12,33 +12,9 @@
 #include "pam_param.h"
 #include "inih/ini.h"
 
-#ifdef __GNUC__
-#define LOG(level, fmt, args...) \
-	do { \
-		if (level < log_level) break; \
-		if (level == LOG_DEBUG) { \
-			pam_syslog(pam, LOG_AUTHPRIV | LOG_DEBUG, "%s:%i " fmt, \
-					__FUNCTION__, __LINE__ , ## args); \
-		} else { \
-			pam_syslog(pam, LOG_AUTHPRIV | level, fmt , ## args); \
-		} \
-	} while (0)
-#else
-#define LOG(level, fmt, ...) \
-	do { \
-		if (level < log_level) break; \
-		if (level == LOG_DEBUG) { \
-			pam_syslog(pam, LOG_AUTHPRIV | LOG_DEBUG, "%s:%i " fmt, \
-					__FUNCTION__, __LINE__ , __VA_ARGS__); \
-		} else { \
-			pam_syslog(pam, LOG_AUTHPRIV | level, fmt , __VA_ARGS__); \
-		} \
-	} while (0)
-#endif /* __GNUC__ */
-
 config cfg;
 char *no_attrs[] = { LDAP_NO_ATTRS, NULL };
-int log_level = LOG_WARNING;
+int debug = 0;
 pam_handle_t *pam = NULL;
 
 char *ldap_escape_filter(const char *filter) {
@@ -142,7 +118,7 @@ int get_single_dn(LDAP *ld, ldap_query q, char **dn) {
 	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, no_attrs,
 			1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
 	if (rc != LDAP_SUCCESS) {
-		LOG(LOG_ERR, "LDAP search '%s' failed: %s",
+		pam_syslog(pam, LOG_ERR, "LDAP search '%s' failed: %s",
 				q.filter, ldap_err2string(rc));
 		goto end;
 	}
@@ -151,15 +127,22 @@ int get_single_dn(LDAP *ld, ldap_query q, char **dn) {
 
 	switch (n_items) {
 		case 0:
-			LOG(LOG_DEBUG, "LDAP search '%s' found no entries.", q.filter);
+			if (debug) {
+				pam_syslog(pam, LOG_DEBUG,
+						"LDAP search '%s' found no entries.", q.filter);
+			}
 			break;
 		case 1:
-			LOG(LOG_DEBUG, "LDAP search '%s' found 1 entry.", q.filter);
+			if (debug) {
+				pam_syslog(pam, LOG_DEBUG,
+						"LDAP search '%s' found 1 entry.", q.filter);
+			}
 			first = ldap_first_entry(ld, res);
 			*dn = ldap_get_dn(ld, first);
 			break;
 		default:
-			LOG(LOG_WARNING, "LDAP search '%s' found %i entries.", q.filter, n_items);
+			pam_syslog(pam, LOG_WARNING,
+					"LDAP search '%s' found %i entries.", q.filter, n_items);
 	}
 
 end:
@@ -181,7 +164,10 @@ void interpolate_filter(ldap_query q, const char *a, const char *b) {
 	snprintf(filter, len, q.filter, a, b);
 	free(q.filter);
 	q.filter = filter;
-	LOG(LOG_DEBUG, "Interpolated search filter '%s'", filter);
+	if (debug) {
+		pam_syslog(pam, LOG_DEBUG,
+				"Interpolated search filter '%s'", filter);
+	}
 }
 
 /* returns:
@@ -199,7 +185,7 @@ int is_super_admin(LDAP *ld, char *user_dn) {
 	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, no_attrs,
 			1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
 	if (rc != LDAP_SUCCESS) {
-		LOG(LOG_ERR, "LDAP search '%s' failed: %s",
+		pam_syslog(pam, LOG_ERR, "LDAP search '%s' failed: %s",
 				q.filter, ldap_err2string(rc));
 		goto end;
 	}
@@ -233,7 +219,7 @@ int user_permitted(LDAP *ld, char *user_dn) {
 	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, no_attrs,
 			1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
 	if (rc != LDAP_SUCCESS) {
-		LOG(LOG_ERR, "LDAP search '%s' failed: %s",
+		pam_syslog(pam, LOG_ERR, "LDAP search '%s' failed: %s",
 				q.filter, ldap_err2string(rc));
 		goto end;
 	}
@@ -246,7 +232,8 @@ end:
 	return result;
 }
 
-int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv) {
+int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
+		int argc, const char **argv) {
 	char host_name[HOST_NAME_MAX];
 	const char **user_name;
 	char *user_dn;
@@ -258,14 +245,14 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 
 	for (i = 0; i < argc; i++) {
 		if (!strcmp(argv[i], "debug")) {
-			log_level = LOG_DEBUG;
+			debug = 1;
 			break;
 		}
 	}
 
 	rc = ini_parse(CONFIG_FILE, handler, NULL);
 	if (rc) {
-		LOG(LOG_CRIT, "Unable to parse ini file");
+		pam_syslog(pam, LOG_CRIT, "Unable to parse ini file");
 		return PAM_AUTH_ERR;
 	}
 
@@ -280,17 +267,18 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	cred.bv_val = cfg.ldap_pw;
 	cred.bv_len = strlen(cfg.ldap_pw);
 
-	rc = ldap_sasl_bind_s(ld, cfg.ldap_dn, LDAP_SASL_SIMPLE, &cred, NULL, NULL, NULL);
+	rc = ldap_sasl_bind_s(ld, cfg.ldap_dn, LDAP_SASL_SIMPLE, &cred,
+			NULL, NULL, NULL);
 	if (rc != LDAP_SUCCESS) return PAM_AUTH_ERR;
 
 	interpolate_filter(cfg.user, *user_name, NULL);
 	rc = get_single_dn(ld, cfg.user, &user_dn);
 	if (rc != 1) {
 		if (rc) {
-			LOG(LOG_ERR, "Multiple DN found for %s", cfg.user);
+			pam_syslog(pam, LOG_ERR, "Multiple DN found for %s", cfg.user);
 			result = PAM_AUTH_ERR;
 		} else {
-			LOG(LOG_WARNING, "Unable to find the DN for %s", cfg.user);
+			pam_syslog(pam, LOG_WARNING, "Unable to find the DN for %s", cfg.user);
 			result = PAM_USER_UNKNOWN;
 		}
 		goto end_ldap;
@@ -300,24 +288,31 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 	result = is_super_admin(ld, user_dn);
 	switch (result) {
 		case PAM_SUCCESS:
-			LOG(LOG_DEBUG, "%s is a super admin", cfg.user);
+			if (debug) {
+				pam_syslog(pam, LOG_DEBUG,
+						"%s is a super admin", cfg.user);
+			}
 			goto end_ldap;
 		case PAM_AUTH_ERR:
-			LOG(LOG_ERR, "Failed to test if %s is a super admin", cfg.user);
+			pam_syslog(pam, LOG_ERR,
+					"Failed to test if %s is a super admin", cfg.user);
 			goto end_ldap;
 	}
 
 	/* get host name */
 	rc = gethostname(host_name, HOST_NAME_MAX);
 	if (rc) {
-		LOG(LOG_ERR, "Unable to determine host name");
+		pam_syslog(pam, LOG_ERR, "Unable to determine host name");
 		result = PAM_AUTH_ERR;
 		goto end_ldap;
 	}
 
 	if (cfg.short_name) {
 		shorten_name(host_name, HOST_NAME_MAX);
-		LOG(LOG_DEBUG, "Short host name is %s", host_name);
+		if (debug) {
+			pam_syslog(pam, LOG_DEBUG,
+					"Short host name is %s", host_name);
+		}
 	}
 
 	interpolate_filter(cfg.host, host_name, NULL);
@@ -327,13 +322,18 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv)
 
 	switch (result) {
 		case PAM_SUCCESS:
-			LOG(LOG_DEBUG, "%s is permitted on %s", cfg.user, host_name);
+			if (debug) {
+				pam_syslog(pam, LOG_DEBUG,
+						"%s is permitted on %s", cfg.user, host_name);
+			}
 			break;
 		case PAM_PERM_DENIED:
-			LOG(LOG_WARNING, "%s is not permitted on %s", cfg.user, host_name);
+			pam_syslog(pam, LOG_WARNING,
+					"%s is not permitted on %s", cfg.user, host_name);
 			break;
 		case PAM_AUTH_ERR:
-			LOG(LOG_ERR, "Failed to test if %s is permitted on %s", cfg.user, host_name);
+			pam_syslog(pam, LOG_ERR,
+					"Failed to test if %s is permitted on %s", cfg.user, host_name);
 	}
 
 end_ldap:
