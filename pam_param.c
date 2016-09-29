@@ -52,7 +52,8 @@ char *ldap_escape_filter(const char *filter) {
 }
 
 /* callback for ini parser */
-int handler(void *user, const char *section, const char *name, const char *value) {
+int handler(void *user, const char *section,
+		const char *name, const char *value) {
 	#define SECTION(s) strcmp(s,section) == 0
 	#define NAME(n) strcmp(n,name) == 0
 
@@ -62,7 +63,7 @@ int handler(void *user, const char *section, const char *name, const char *value
 		if (NAME("uri")) {
 			cfg.ldap_uri = strdup(value);
 		} else if (NAME("binddn")) {
-			cfg.ldap_dn = strdup(value);
+			cfg.ldap_dn = ( *(char *) value == 0 ) ?  NULL : strdup(value);
 		} else if (NAME("bindpw")) {
 			cfg.ldap_pw = strdup(value);
 		} else {
