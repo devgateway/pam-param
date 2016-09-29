@@ -278,8 +278,8 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 	rc = ldap_sasl_bind_s(ld, cfg.ldap_dn, LDAP_SASL_SIMPLE, &cred,
 			NULL, NULL, NULL);
 	if (rc != LDAP_SUCCESS) {
-		pam_syslog(pam, LOG_ERR, "Unable to bind to LDAP at %s",
-				cfg.ldap_uri);
+		pam_syslog(pam, LOG_ERR, "Unable to bind to LDAP at %s: %s",
+				cfg.ldap_uri, ldap_err2string(rc));
 		return PAM_AUTH_ERR;
 	}
 
