@@ -257,6 +257,13 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 	}
 
 	/* get user name from PAM */
+	rc = pam_get_item(pamh, PAM_USER, &user_name);
+	if (rc != PAM_SUCCESS
+			|| user_name == NULL
+			|| *(const char *)user_name == '\0') {
+		pam_syslog(pam, LOG_NOTICE, "Cannot obtain the user name");
+		return PAM_USER_UNKNOWN;
+	}
 	rc = pam_get_user(pamh, user_name, NULL);
 	if (rc != PAM_SUCCESS) return PAM_AUTH_ERR;
 
