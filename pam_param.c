@@ -65,7 +65,7 @@ int handler(void *user, const char *section,
 		} else if (NAME("binddn")) {
 			cfg.ldap_dn = ( *(char *) value == 0 ) ?  NULL : strdup(value);
 		} else if (NAME("bindpw")) {
-			cfg.ldap_pw = strdup(value);
+			cfg.ldap_pw = ( *(char *) value == 0 ) ?  NULL : strdup(value);
 		} else {
 			return 0;
 		}
@@ -273,7 +273,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 	if (rc != LDAP_SUCCESS) return PAM_AUTH_ERR;
 
 	cred.bv_val = cfg.ldap_pw;
-	cred.bv_len = strlen(cfg.ldap_pw);
+	cred.bv_len = cfg.ldap_pw ? strlen(cfg.ldap_pw) : 0;
 
 	rc = ldap_sasl_bind_s(ld, cfg.ldap_dn, LDAP_SASL_SIMPLE, &cred,
 			NULL, NULL, NULL);
