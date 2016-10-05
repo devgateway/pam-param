@@ -10,6 +10,7 @@
 #include <pam_ext.h>
 #include <errno.h>
 #include <string.h>
+#include <strings.h>
 
 #include "pam_param.h"
 #include "inih/ini.h"
@@ -58,6 +59,7 @@ int handler(void *user, const char *section,
 		const char *name, const char *value) {
 	#define SECTION(s) strcmp(s,section) == 0
 	#define NAME(n) strcmp(n,name) == 0
+	#define SCOPE(s) strcasecmp(s,value) == 0
 
 	if (SECTION("")) {
 		if (NAME("short_name")) cfg.short_name = atoi(value);
@@ -89,7 +91,15 @@ int handler(void *user, const char *section,
 		if (NAME("base")) {
 			q->base = strdup(value);
 		} else if (NAME("scope")) {
-			q->scope = atoi(value);
+			if (SCOPE("base")) {
+				q->scope = LDAP_SCOPE_BASE;
+			} else if (SCOPE("one")) {
+				q->scope = LDAP_SCOPE_ONE;
+			} else if (SCOPE("sub")) {
+				q->scope = LDAP_SCOPE_SUB;
+			} else {
+				return 0;
+			}
 		} else if (NAME("filter")) {
 			q->filter = strdup(value);
 		} else {
