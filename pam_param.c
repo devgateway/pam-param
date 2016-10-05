@@ -205,7 +205,6 @@ int is_super_admin(LDAP *ld, char *user_dn) {
 	result = ldap_count_entries(ld, res) ? PAM_SUCCESS : PAM_IGNORE;
 
 end:
-	if (user_dn) ldap_memfree(user_dn);
 	if (res) ldap_msgfree(res);
 	return result;
 }
@@ -238,8 +237,8 @@ int user_permitted(LDAP *ld, char *user_dn) {
 	result = ldap_count_entries(ld, res) ? PAM_SUCCESS : PAM_PERM_DENIED;
 
 end:
-	if (user_dn) ldap_memfree(user_dn);
 	if (host_dn) ldap_memfree(host_dn);
+	if (res) ldap_msgfree(res);
 	return result;
 }
 
@@ -375,5 +374,6 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 
 end_ldap:
 	ldap_unbind_ext(ld, NULL, NULL);
+	if (user_dn) ldap_memfree(user_dn);
 	return result;
 }
