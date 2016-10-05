@@ -8,6 +8,8 @@
 #include <lber.h>
 #include <syslog.h>
 #include <pam_ext.h>
+#include <errno.h>
+#include <string.h>
 
 #include "pam_param.h"
 #include "inih/ini.h"
@@ -266,11 +268,25 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 		return PAM_USER_UNKNOWN;
 	}
 	rc = pam_get_user(pamh, user_name, NULL);
-	if (rc != PAM_SUCCESS) return PAM_AUTH_ERR;
+	if (rc != PAM_SUCCESS) {
+		pam_syslog(pam, LOG_ERR, "Unable to get user name from PAM");
+		return PAM_AUTH_ERR;
+	}
 
 	/* connect to LDAP */
 	rc = ldap_initialize(&ld, cfg.ldap_uri);
-	if (rc != LDAP_SUCCESS) return PAM_AUTH_ERR;
+	if (rc != LDAP_SUCCESS) {
+		pam_syslog(pam, LOG_ERR, "Unable to initialize LDAP library: %s",
+				strerror(errno));
+		return PAM_AUTH_ERR;
+	}
+
+	const int version = LDAP_VERSION3;
+	rc = ldap_set_option(ld, LDAP_OPT_PROTOCOL_VERSION, &version);
+	if (rc != LDAP_OPT_SUCCESS) {
+		pam_syslog(pam, LOG_ERR, "Unable to request LDAPv3 protocol");
+		return PAM_AUTH_ERR;
+	}
 
 	cred.bv_val = cfg.ldap_pw;
 	cred.bv_len = cfg.ldap_pw ? strlen(cfg.ldap_pw) : 0;
