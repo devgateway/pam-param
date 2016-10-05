@@ -324,6 +324,12 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 						"%s is a super admin", user_name);
 			}
 			goto end_ldap;
+		case PAM_IGNORE:
+			if (debug) {
+				pam_syslog(pam, LOG_DEBUG,
+						"%s is not a super admin, continuing", user_name);
+			}
+			break;
 		default:
 			pam_syslog(pam, LOG_ERR,
 					"Failed to test if %s is a super admin", user_name);
