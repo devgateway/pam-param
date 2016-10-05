@@ -123,16 +123,16 @@ void shorten_name(char *host_name, int len) {
 /* runs an LDAP query, and returns the DN of a single result;
  * fails if more than one result found (collision);
  * returns number of entries found */
-int get_single_dn(LDAP *ld, ldap_query q, char **dn) {
+int get_single_dn(LDAP *ld, ldap_query *q, char **dn) {
 	int rc, n_items = 0;
 	LDAPMessage *res = NULL;
 	LDAPMessage *first;
 
-	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, no_attrs,
+	rc = ldap_search_ext_s(ld, q->base, q->scope, q->filter, no_attrs,
 			1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
 	if (rc != LDAP_SUCCESS) {
 		pam_syslog(pam, LOG_ERR, "LDAP search '%s' failed: %s",
-				q.filter, ldap_err2string(rc));
+				q->filter, ldap_err2string(rc));
 		goto end;
 	}
 
@@ -142,20 +142,20 @@ int get_single_dn(LDAP *ld, ldap_query q, char **dn) {
 		case 0:
 			if (debug) {
 				pam_syslog(pam, LOG_DEBUG,
-						"LDAP search '%s' found no entries.", q.filter);
+						"LDAP search '%s' found no entries.", q->filter);
 			}
 			break;
 		case 1:
 			if (debug) {
 				pam_syslog(pam, LOG_DEBUG,
-						"LDAP search '%s' found 1 entry.", q.filter);
+						"LDAP search '%s' found 1 entry.", q->filter);
 			}
 			first = ldap_first_entry(ld, res);
 			*dn = ldap_get_dn(ld, first);
 			break;
 		default:
 			pam_syslog(pam, LOG_WARNING,
-					"LDAP search '%s' found %i entries.", q.filter, n_items);
+					"LDAP search '%s' found %i entries.", q->filter, n_items);
 	}
 
 end:
@@ -219,7 +219,7 @@ int user_permitted(LDAP *ld, char *user_dn) {
 	int rc, count, result = PAM_AUTH_ERR;
 	LDAPMessage *res;
 
-	rc = get_single_dn(ld, cfg.host, &host_dn);
+	rc = get_single_dn(ld, &cfg.host, &host_dn);
 	if (rc != 1) {
 		result = PAM_AUTH_ERR;
 		goto end;
@@ -303,7 +303,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 	}
 
 	interpolate_filter(&cfg.user, user_name, NULL);
-	rc = get_single_dn(ld, cfg.user, &user_dn);
+	rc = get_single_dn(ld, &cfg.user, &user_dn);
 	if (rc != 1) {
 		if (rc) {
 			pam_syslog(pam, LOG_ERR, "Multiple DN found for %s", cfg.user);
