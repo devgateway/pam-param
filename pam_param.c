@@ -321,12 +321,12 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 		case PAM_SUCCESS:
 			if (debug) {
 				pam_syslog(pam, LOG_DEBUG,
-						"%s is a super admin", cfg.user);
+						"%s is a super admin", user_name);
 			}
 			goto end_ldap;
-		case PAM_AUTH_ERR:
+		default:
 			pam_syslog(pam, LOG_ERR,
-					"Failed to test if %s is a super admin", cfg.user);
+					"Failed to test if %s is a super admin", user_name);
 			goto end_ldap;
 	}
 
@@ -355,16 +355,16 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 		case PAM_SUCCESS:
 			if (debug) {
 				pam_syslog(pam, LOG_DEBUG,
-						"%s is permitted on %s", cfg.user, host_name);
+						"%s is permitted on %s", user_name, host_name);
 			}
 			break;
 		case PAM_PERM_DENIED:
 			pam_syslog(pam, LOG_WARNING,
-					"%s is not permitted on %s", cfg.user, host_name);
+					"%s is not permitted on %s", user_name, host_name);
 			break;
 		case PAM_AUTH_ERR:
 			pam_syslog(pam, LOG_ERR,
-					"Failed to test if %s is permitted on %s", cfg.user, host_name);
+					"Failed to test if %s is permitted on %s", user_name, host_name);
 	}
 
 end_ldap:
