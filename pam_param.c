@@ -238,7 +238,7 @@ end:
 int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 		int argc, const char **argv) {
 	char host_name[HOST_NAME_MAX];
-	const char **user_name;
+	const char *user_name;
 	char *user_dn;
 	LDAP *ld;
 	struct berval cred;
@@ -260,17 +260,12 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 	}
 
 	/* get user name from PAM */
-	rc = pam_get_item(pamh, PAM_USER, &user_name);
+	rc = pam_get_item(pamh, PAM_USER, (const void **) &user_name);
 	if (rc != PAM_SUCCESS
 			|| user_name == NULL
 			|| *(const char *)user_name == '\0') {
 		pam_syslog(pam, LOG_NOTICE, "Cannot obtain the user name");
 		return PAM_USER_UNKNOWN;
-	}
-	rc = pam_get_user(pamh, user_name, NULL);
-	if (rc != PAM_SUCCESS) {
-		pam_syslog(pam, LOG_ERR, "Unable to get user name from PAM");
-		return PAM_AUTH_ERR;
 	}
 
 	/* connect to LDAP */
@@ -299,7 +294,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 		return PAM_AUTH_ERR;
 	}
 
-	interpolate_filter(cfg.user, *user_name, NULL);
+	interpolate_filter(cfg.user, user_name, NULL);
 	rc = get_single_dn(ld, cfg.user, &user_dn);
 	if (rc != 1) {
 		if (rc) {
