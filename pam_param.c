@@ -154,22 +154,22 @@ end:
 }
 
 /* printf arguments into LDAP filter */
-void interpolate_filter(ldap_query q, const char *a, const char *b) {
+void interpolate_filter(ldap_query *q, const char *a, const char *b) {
 	char *filter;
 	size_t len;
 
-	len = strlen(q.filter);
+	len = strlen(q->filter);
 
 	if (a) len += strlen(a);
 	if (b) len += strlen(b);
 
 	filter = (char *) malloc(++len);
-	snprintf(filter, len, q.filter, a, b);
-	free(q.filter);
-	q.filter = filter;
+	snprintf(filter, len, q->filter, a, b);
+	free(q->filter);
+	q->filter = filter;
 	if (debug) {
 		pam_syslog(pam, LOG_DEBUG,
-				"Interpolated search filter '%s'", filter);
+				"Interpolated search filter '%s'", q->filter);
 	}
 }
 
@@ -180,16 +180,15 @@ void interpolate_filter(ldap_query q, const char *a, const char *b) {
  * PAM_AUTH_ERR if search failed or collision found */
 int is_super_admin(LDAP *ld, char *user_dn) {
 	int rc, result = PAM_AUTH_ERR;
-	ldap_query q = cfg.admin;
 	LDAPMessage *res = NULL;
 
-	interpolate_filter(q, user_dn, NULL);
+	interpolate_filter(&cfg.admin, user_dn, NULL);
 
-	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, no_attrs,
-			1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
+	rc = ldap_search_ext_s(ld, cfg.admin.base, cfg.admin.scope, cfg.admin.filter,
+			no_attrs, 1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
 	if (rc != LDAP_SUCCESS) {
 		pam_syslog(pam, LOG_ERR, "LDAP search '%s' failed: %s",
-				q.filter, ldap_err2string(rc));
+				cfg.admin.filter, ldap_err2string(rc));
 		goto end;
 	}
 
@@ -208,7 +207,6 @@ end:
 int user_permitted(LDAP *ld, char *user_dn) {
 	char *host_dn = NULL;
 	int rc, count, result = PAM_AUTH_ERR;
-	ldap_query q = cfg.membership;
 	LDAPMessage *res;
 
 	rc = get_single_dn(ld, cfg.host, &host_dn);
@@ -217,13 +215,13 @@ int user_permitted(LDAP *ld, char *user_dn) {
 		goto end;
 	}
 
-	interpolate_filter(q, user_dn, host_dn);
+	interpolate_filter(&cfg.membership, user_dn, host_dn);
 
-	rc = ldap_search_ext_s(ld, q.base, q.scope, q.filter, no_attrs,
+	rc = ldap_search_ext_s(ld, cfg.membership.base, cfg.membership.scope, cfg.membership.filter, no_attrs,
 			1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
 	if (rc != LDAP_SUCCESS) {
 		pam_syslog(pam, LOG_ERR, "LDAP search '%s' failed: %s",
-				q.filter, ldap_err2string(rc));
+				cfg.membership.filter, ldap_err2string(rc));
 		goto end;
 	}
 
@@ -294,7 +292,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 		return PAM_AUTH_ERR;
 	}
 
-	interpolate_filter(cfg.user, user_name, NULL);
+	interpolate_filter(&cfg.user, user_name, NULL);
 	rc = get_single_dn(ld, cfg.user, &user_dn);
 	if (rc != 1) {
 		if (rc) {
@@ -338,7 +336,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 		}
 	}
 
-	interpolate_filter(cfg.host, host_name, NULL);
+	interpolate_filter(&cfg.host, host_name, NULL);
 
 	/* check if access permitted */
 	result = user_permitted(ld, user_dn);
