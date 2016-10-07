@@ -47,6 +47,7 @@ make DESTDIR=%buildroot install
 %files
 %{_moduledir}/*
 %config %attr(0600,-,-) %{_secconfdir}/%name.ini
+%doc LICENSE-php
 
 %files test
 %_sbindir/*

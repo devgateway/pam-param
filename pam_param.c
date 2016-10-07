@@ -20,6 +20,10 @@ char *no_attrs[] = { LDAP_NO_ATTRS, NULL };
 int debug = 0;
 pam_handle_t *pam = NULL;
 
+/*
+ * This function is based on PHP implementation of ldap_escape.
+ * See LICENSE-php for copyright info.
+ */
 char *ldap_escape_filter(const char *filter) {
 	char map[256] = {0};
 	char unsafe[] = "\\*()\0";
