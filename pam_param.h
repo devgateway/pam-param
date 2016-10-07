@@ -39,6 +39,3 @@ typedef struct {
 #ifndef CONFIG_FILE
 #define CONFIG_FILE "/etc/pam_param.ini"
 #endif
-
-int handler(void *user, const char *section, const char *name, const char *value);
-void shorten_name(char *host_name, int len);

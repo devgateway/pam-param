@@ -15,10 +15,36 @@
 #include "pam_param.h"
 #include "inih/ini.h"
 
-config cfg;
+typedef enum {
+  CFG_SHORTEN,
+  CFG_LDAP_URI,
+  CFG_LDAP_DN,
+  CFG_LDAP_PW,
+  CFG_ADM_BASE,
+  CFG_ADM_SCOPE,
+  CFG_ADM_FILT,
+  CFG_USR_BASE,
+  CFG_USR_SCOPE,
+  CFG_USR_FILT,
+  CFG_HOST_BASE,
+  CFG_HOST_SCOPE,
+  CFG_HOST_FILT,
+  CFG_MEMB_BASE,
+  CFG_MEMB_SCOPE,
+  CFG_MEMB_FILT
+} cfg_index;
+
+typedef struct {
+	const char *section;
+	const char *name;
+	cfg_index index;
+} cfg_line;
+
+config my_config;
 char *no_attrs[] = { LDAP_NO_ATTRS, NULL };
 int debug = 0;
 pam_handle_t *pam = NULL;
+char *cfg[10];
 
 /*
  * This function is based on PHP implementation of ldap_escape.
@@ -61,19 +87,47 @@ char *ldap_escape_filter(const char *filter) {
 /* callback for ini parser */
 int handler(void *user, const char *section,
 		const char *name, const char *value) {
+	static cfg_line cfg_lines[] = {
+		{"",       "short_name",  CFG_SHORTEN},
+		{"ldap",   "uri",         CFG_LDAP_URI},
+		{"ldap",   "binddn",      CFG_LDAP_DN},
+		{"ldap",   "bindpw",      CFG_LDAP_PW},
+		{"admin",  "base",        CFG_ADM_BASE},
+		{"admin",  "scope",       CFG_ADM_SCOPE},
+		{"admin",  "filter",      CFG_ADM_FILT},
+		{"user",   "base",        CFG_USR_BASE},
+		{"user",   "scope",       CFG_USR_SCOPE},
+		{"user",   "filter",      CFG_USR_FILT},
+		{"host",   "base",        CFG_HOST_BASE},
+		{"host",   "scope",       CFG_HOST_SCOPE},
+		{"host",   "filter",      CFG_HOST_FILT},
+		{"host",   "base",        CFG_HOST_BASE},
+		{"host",   "scope",       CFG_HOST_SCOPE},
+		{"host",   "filter",      CFG_HOST_FILT},
+	}
+	static n_lines = sizeof(cfg_lines);
+	int i;
+
+	for (i = 0; i < n_lines; i++) {
+		if (	!(strcmp(section, cfg_lines[i].section) |
+					  strcmp(name,    cfg_lines[i].name)) ) {
+			cfg[cfg_lines[i].index] = strdup(value);
+		}
+	}
+
 	#define SECTION(s) strcmp(s,section) == 0
 	#define NAME(n) strcmp(n,name) == 0
 	#define SCOPE(s) strcasecmp(s,value) == 0
 
 	if (SECTION("")) {
-		if (NAME("short_name")) cfg.short_name = atoi(value);
+		if (NAME("short_name")) my_config.short_name = atoi(value);
 	} else if (SECTION("ldap")) {
 		if (NAME("uri")) {
-			cfg.ldap_uri = strdup(value);
+			my_config.ldap_uri = strdup(value);
 		} else if (NAME("binddn")) {
-			cfg.ldap_dn = ( *(char *) value == 0 ) ?  NULL : strdup(value);
+			my_config.ldap_dn = ( *(char *) value == 0 ) ?  NULL : strdup(value);
 		} else if (NAME("bindpw")) {
-			cfg.ldap_pw = ( *(char *) value == 0 ) ?  NULL : strdup(value);
+			my_config.ldap_pw = ( *(char *) value == 0 ) ?  NULL : strdup(value);
 		} else {
 			return 0;
 		}
@@ -81,13 +135,13 @@ int handler(void *user, const char *section,
 		ldap_query *q;
 
 		if (SECTION("admin")) {
-			q = &(cfg.admin);
+			q = &(my_config.admin);
 		} else if (SECTION("user")) {
-			q = &(cfg.user);
+			q = &(my_config.user);
 		} else if (SECTION("host")) {
-			q = &(cfg.host);
+			q = &(my_config.host);
 		} else if (SECTION("membership")) {
-			q = &(cfg.membership);
+			q = &(my_config.membership);
 		} else {
 			return 0;
 		}
@@ -196,13 +250,13 @@ int is_super_admin(LDAP *ld, char *user_dn) {
 	int rc, result = PAM_AUTH_ERR;
 	LDAPMessage *res = NULL;
 
-	interpolate_filter(&cfg.admin, user_dn, NULL);
+	interpolate_filter(&my_config.admin, user_dn, NULL);
 
-	rc = ldap_search_ext_s(ld, cfg.admin.base, cfg.admin.scope, cfg.admin.filter,
+	rc = ldap_search_ext_s(ld, my_config.admin.base, my_config.admin.scope, my_config.admin.filter,
 			no_attrs, 1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
 	if (rc != LDAP_SUCCESS) {
 		pam_syslog(pam, LOG_ERR, "LDAP search '%s' failed: %s",
-				cfg.admin.filter, ldap_err2string(rc));
+				my_config.admin.filter, ldap_err2string(rc));
 		goto end;
 	}
 
@@ -222,19 +276,19 @@ int user_permitted(LDAP *ld, char *user_dn) {
 	int rc, count, result = PAM_AUTH_ERR;
 	LDAPMessage *res;
 
-	rc = get_single_dn(ld, &cfg.host, &host_dn);
+	rc = get_single_dn(ld, &my_config.host, &host_dn);
 	if (rc != 1) {
 		result = PAM_AUTH_ERR;
 		goto end;
 	}
 
-	interpolate_filter(&cfg.membership, user_dn, host_dn);
+	interpolate_filter(&my_config.membership, user_dn, host_dn);
 
-	rc = ldap_search_ext_s(ld, cfg.membership.base, cfg.membership.scope, cfg.membership.filter, no_attrs,
+	rc = ldap_search_ext_s(ld, my_config.membership.base, my_config.membership.scope, my_config.membership.filter, no_attrs,
 			1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
 	if (rc != LDAP_SUCCESS) {
 		pam_syslog(pam, LOG_ERR, "LDAP search '%s' failed: %s",
-				cfg.membership.filter, ldap_err2string(rc));
+				my_config.membership.filter, ldap_err2string(rc));
 		goto end;
 	}
 
@@ -244,6 +298,11 @@ end:
 	if (host_dn) ldap_memfree(host_dn);
 	if (res) ldap_msgfree(res);
 	return result;
+}
+
+int read_config() {
+	memset((void *) &cfg, 0, sizeof(cfg));
+	return ini_parse(CONFIG_FILE, handler, NULL);
 }
 
 int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
@@ -257,6 +316,8 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 
 	pam = pamh;
 
+	memset((void *) &my_config, 0, sizeof(my_config));
+
 	for (i = 0; i < argc; i++) {
 		if (!strcmp(argv[i], "debug")) {
 			debug = 1;
@@ -264,7 +325,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 		}
 	}
 
-	rc = ini_parse(CONFIG_FILE, handler, NULL);
+	rc = read_config();
 	if (rc) {
 		pam_syslog(pam, LOG_CRIT, "Unable to parse ini file");
 		return PAM_AUTH_ERR;
@@ -280,7 +341,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 	}
 
 	/* connect to LDAP */
-	rc = ldap_initialize(&ld, cfg.ldap_uri);
+	rc = ldap_initialize(&ld, my_config.ldap_uri);
 	if (rc != LDAP_SUCCESS) {
 		pam_syslog(pam, LOG_ERR, "Unable to initialize LDAP library: %s",
 				strerror(errno));
@@ -294,25 +355,25 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 		return PAM_AUTH_ERR;
 	}
 
-	cred.bv_val = cfg.ldap_pw;
-	cred.bv_len = cfg.ldap_pw ? strlen(cfg.ldap_pw) : 0;
+	cred.bv_val = my_config.ldap_pw;
+	cred.bv_len = my_config.ldap_pw ? strlen(my_config.ldap_pw) : 0;
 
-	rc = ldap_sasl_bind_s(ld, cfg.ldap_dn, LDAP_SASL_SIMPLE, &cred,
+	rc = ldap_sasl_bind_s(ld, my_config.ldap_dn, LDAP_SASL_SIMPLE, &cred,
 			NULL, NULL, NULL);
 	if (rc != LDAP_SUCCESS) {
 		pam_syslog(pam, LOG_ERR, "Unable to bind to LDAP at %s: %s",
-				cfg.ldap_uri, ldap_err2string(rc));
+				my_config.ldap_uri, ldap_err2string(rc));
 		return PAM_AUTH_ERR;
 	}
 
-	interpolate_filter(&cfg.user, user_name, NULL);
-	rc = get_single_dn(ld, &cfg.user, &user_dn);
+	interpolate_filter(&my_config.user, user_name, NULL);
+	rc = get_single_dn(ld, &my_config.user, &user_dn);
 	if (rc != 1) {
 		if (rc) {
-			pam_syslog(pam, LOG_ERR, "Multiple DN found for %s", cfg.user);
+			pam_syslog(pam, LOG_ERR, "Multiple DN found for %s", my_config.user);
 			result = PAM_AUTH_ERR;
 		} else {
-			pam_syslog(pam, LOG_WARNING, "Unable to find the DN for %s", cfg.user);
+			pam_syslog(pam, LOG_WARNING, "Unable to find the DN for %s", my_config.user);
 			result = PAM_USER_UNKNOWN;
 		}
 		goto end_ldap;
@@ -347,7 +408,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 		goto end_ldap;
 	}
 
-	if (cfg.short_name) {
+	if (my_config.short_name) {
 		shorten_name(host_name, HOST_NAME_MAX);
 		if (debug) {
 			pam_syslog(pam, LOG_DEBUG,
@@ -355,7 +416,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 		}
 	}
 
-	interpolate_filter(&cfg.host, host_name, NULL);
+	interpolate_filter(&my_config.host, host_name, NULL);
 
 	/* check if access permitted */
 	result = user_permitted(ld, user_dn);
