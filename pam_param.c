@@ -331,15 +331,13 @@ int is_super_admin(LDAP *ld, char *user_dn) {
 
 	rc = ldap_search_ext_s(ld, cfg[CFG_ADM_BASE], scope, filter,
 			no_attrs, 1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
-	if (rc != LDAP_SUCCESS) {
+	if (rc == LDAP_SUCCESS) {
+		result = ldap_count_entries(ld, res) ? PAM_SUCCESS : PAM_IGNORE;
+	} else {
 		pam_syslog(pam, LOG_ERR, "LDAP search '%s' failed: %s",
 				filter, ldap_err2string(rc));
-		goto end;
 	}
 
-	result = ldap_count_entries(ld, res) ? PAM_SUCCESS : PAM_IGNORE;
-
-end:
 	if (res) ldap_msgfree(res);
 	free(filter);
 	return result;
@@ -349,32 +347,22 @@ end:
  * PAM_SUCCESS if user is permitted;
  * PAM_PERM_DENIED if not;
  * PAM_AUTH_ERR if search failed or collision found */
-int user_permitted(LDAP *ld, char *user_dn) {
-	char *host_dn = NULL;
-	int rc, count, result = PAM_AUTH_ERR;
+int user_permitted(LDAP *ld, const char *user_dn, const char *host_dn) {
+	int rc, result = PAM_AUTH_ERR;
 	LDAPMessage *res;
-
-	rc = get_single_dn(ld, &my_config.host, &host_dn);
-	if (rc != 1) {
-		result = PAM_AUTH_ERR;
-		goto end;
-	}
 
 	char *filter = interpolate_filter(cfg[CFG_MEMB_FILT], user_dn, host_dn);
 	int scope = get_scope(cfg[CFG_MEMB_SCOPE]);
 
 	rc = ldap_search_ext_s(ld, cfg[CFG_MEMB_BASE], scope, filter, no_attrs,
 			1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
-	if (rc != LDAP_SUCCESS) {
+	if (rc == LDAP_SUCCESS) {
+		result = ldap_count_entries(ld, res) ? PAM_SUCCESS : PAM_PERM_DENIED;
+	} else {
 		pam_syslog(pam, LOG_ERR, "LDAP search '%s' failed: %s",
-				my_config.membership.filter, ldap_err2string(rc));
-		goto end;
+				filter, ldap_err2string(rc));
 	}
 
-	result = ldap_count_entries(ld, res) ? PAM_SUCCESS : PAM_PERM_DENIED;
-
-end:
-	if (host_dn) ldap_memfree(host_dn);
 	if (res) ldap_msgfree(res);
 	free(filter);
 	return result;
