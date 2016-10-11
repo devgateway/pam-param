@@ -104,8 +104,8 @@ int handler(void *user, const char *section,
 		{"host",   "base",        CFG_HOST_BASE},
 		{"host",   "scope",       CFG_HOST_SCOPE},
 		{"host",   "filter",      CFG_HOST_FILT},
-	}
-	static n_lines = sizeof(cfg_lines);
+	};
+	static size_t n_lines = sizeof(cfg_lines);
 	int i;
 
 	for (i = 0; i < n_lines; i++) {
@@ -115,6 +115,7 @@ int handler(void *user, const char *section,
 		}
 	}
 
+	/*
 	#define SECTION(s) strcmp(s,section) == 0
 	#define NAME(n) strcmp(n,name) == 0
 	#define SCOPE(s) strcasecmp(s,value) == 0
@@ -164,6 +165,7 @@ int handler(void *user, const char *section,
 			return 0;
 		}
 	}
+	*/
 	return 1;
 }
 
