@@ -240,16 +240,16 @@ inline static LDAP *ldap_connect() {
 /* runs an LDAP query, and returns the DN of a single result;
  * fails if more than one result found (collision);
  * returns number of entries found */
-int get_single_dn(LDAP *ld, ldap_query *q, char **dn) {
+int get_single_dn(LDAP *ld, const char *base, int scope, const char *filter, char **dn) {
 	int rc, n_items = 0;
 	LDAPMessage *res = NULL;
 	LDAPMessage *first;
 
-	rc = ldap_search_ext_s(ld, q->base, q->scope, q->filter, no_attrs,
+	rc = ldap_search_ext_s(ld, base, scope, filter, no_attrs,
 			1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
 	if (rc != LDAP_SUCCESS) {
 		pam_syslog(pam, LOG_ERR, "LDAP search '%s' failed: %s",
-				q->filter, ldap_err2string(rc));
+				filter, ldap_err2string(rc));
 		goto end;
 	}
 
@@ -259,20 +259,22 @@ int get_single_dn(LDAP *ld, ldap_query *q, char **dn) {
 		case 0:
 			if (debug) {
 				pam_syslog(pam, LOG_DEBUG,
-						"LDAP search '%s' found no entries.", q->filter);
+						"LDAP search '%s' found no entries.", filter);
 			}
+			*dn = NULL;
 			break;
 		case 1:
 			if (debug) {
 				pam_syslog(pam, LOG_DEBUG,
-						"LDAP search '%s' found 1 entry.", q->filter);
+						"LDAP search '%s' found 1 entry.", filter);
 			}
 			first = ldap_first_entry(ld, res);
 			*dn = ldap_get_dn(ld, first);
 			break;
 		default:
 			pam_syslog(pam, LOG_WARNING,
-					"LDAP search '%s' found %i entries.", q->filter, n_items);
+					"LDAP search '%s' found %i entries.", filter, n_items);
+			*dn = NULL;
 	}
 
 end:
@@ -423,16 +425,20 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 	if (!ld) return PAM_AUTH_ERR;
 
 	char *user_filter = interpolate_filter(cfg[CFG_USR_FILT], user_name, NULL);
-	rc = get_single_dn(ld, &my_config.user, &user_dn);
-	if (rc != 1) {
-		if (rc) {
-			pam_syslog(pam, LOG_ERR, "Multiple DN found for %s", my_config.user);
-			result = PAM_AUTH_ERR;
-		} else {
+	int user_scope = get_scope(cfg[CFG_USR_SCOPE]);
+	/* TODO */
+	rc = get_single_dn(ld, cfg[CFG_USR_BASE], user_scope, user_filter, &user_dn);
+	switch (rc) {
+		case 1:
+			break;
+		case 0:
 			pam_syslog(pam, LOG_WARNING, "Unable to find the DN for %s", my_config.user);
 			result = PAM_USER_UNKNOWN;
-		}
-		goto end_ldap;
+			goto end_ldap;
+		default:
+			pam_syslog(pam, LOG_ERR, "Multiple DN found for %s", my_config.user);
+			result = PAM_AUTH_ERR;
+			goto end_ldap;
 	}
 
 	/* check if is super admin */
