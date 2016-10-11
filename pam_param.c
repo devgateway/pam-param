@@ -224,23 +224,21 @@ end:
 }
 
 /* printf arguments into LDAP filter */
-void interpolate_filter(ldap_query *q, const char *a, const char *b) {
-	char *filter;
-	size_t len;
-
-	len = strlen(q->filter);
+const char *interpolate_filter(const char *filt_templ, const char *a, const char *b) {
+	char *result;
+	size_t len = strlen(filt_templ);
 
 	if (a) len += strlen(a);
 	if (b) len += strlen(b);
 
-	filter = (char *) malloc(++len);
-	snprintf(filter, len, q->filter, a, b);
-	free(q->filter);
-	q->filter = filter;
+	result = (char *) malloc(++len);
+	snprintf(result, len, filt_templ, a, b);
 	if (debug) {
 		pam_syslog(pam, LOG_DEBUG,
-				"Interpolated search filter '%s'", q->filter);
+				"Interpolated search filter '%s'", result);
 	}
+
+	return result;
 }
 
 /* returns:
