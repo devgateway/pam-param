@@ -34,13 +34,17 @@ typedef enum {
   CFG_MEMB_FILT
 } cfg_index;
 
-typedef struct {
-	const char *section;
-	const char *name;
-	cfg_index index;
-} cfg_line;
+char *ldap_escape_filter(const char *filter);
+int handler(void *user, const char *section,
+		const char *name, const char *value);
+inline static char *get_host_dn(LDAP *ld);
+inline static LDAP *ldap_connect();
+int get_single_dn(LDAP *ld, const char *base, int scope, const char *filter, char **dn);
+char *interpolate_filter(const char *filt_templ, const char *a, const char *b);
+static inline int get_scope(const char *scope_str);
+int is_super_admin(LDAP *ld, char *user_dn);
+int user_permitted(LDAP *ld, const char *user_dn, const char *host_dn);
 
-config my_config;
 char *no_attrs[] = { LDAP_NO_ATTRS, NULL };
 int debug = 0;
 pam_handle_t *pam = NULL;
@@ -87,6 +91,11 @@ char *ldap_escape_filter(const char *filter) {
 /* callback for ini parser */
 int handler(void *user, const char *section,
 		const char *name, const char *value) {
+	typedef struct {
+		const char *section;
+		const char *name;
+		cfg_index index;
+	} cfg_line;
 	static cfg_line cfg_lines[] = {
 		{"",       "short_name",  CFG_SHORTEN},
 		{"ldap",   "uri",         CFG_LDAP_URI},
@@ -115,80 +124,25 @@ int handler(void *user, const char *section,
 		}
 	}
 
-	/*
-	#define SECTION(s) strcmp(s,section) == 0
-	#define NAME(n) strcmp(n,name) == 0
-	#define SCOPE(s) strcasecmp(s,value) == 0
-
-	if (SECTION("")) {
-		if (NAME("short_name")) my_config.short_name = atoi(value);
-	} else if (SECTION("ldap")) {
-		if (NAME("uri")) {
-			my_config.ldap_uri = strdup(value);
-		} else if (NAME("binddn")) {
-			my_config.ldap_dn = ( *(char *) value == 0 ) ?  NULL : strdup(value);
-		} else if (NAME("bindpw")) {
-			my_config.ldap_pw = ( *(char *) value == 0 ) ?  NULL : strdup(value);
-		} else {
-			return 0;
-		}
-	} else {
-		ldap_query *q;
-
-		if (SECTION("admin")) {
-			q = &(my_config.admin);
-		} else if (SECTION("user")) {
-			q = &(my_config.user);
-		} else if (SECTION("host")) {
-			q = &(my_config.host);
-		} else if (SECTION("membership")) {
-			q = &(my_config.membership);
-		} else {
-			return 0;
-		}
-
-		if (NAME("base")) {
-			q->base = strdup(value);
-		} else if (NAME("scope")) {
-			if (SCOPE("base")) {
-				q->scope = LDAP_SCOPE_BASE;
-			} else if (SCOPE("one")) {
-				q->scope = LDAP_SCOPE_ONE;
-			} else if (SCOPE("sub")) {
-				q->scope = LDAP_SCOPE_SUB;
-			} else {
-				return 0;
-			}
-		} else if (NAME("filter")) {
-			q->filter = strdup(value);
-		} else {
-			return 0;
-		}
-	}
-	*/
 	return 1;
 }
 
-/* remove domain parts from hostname */
-void shorten_name(char *host_name, int len) {
-	char *c;
-	for (c = host_name; c < host_name + len; c++) {
-		switch (*c) {
-			case '.':	*c = 0;
-			case 0:	  return;
-		}
-	}
-}
-
 inline static char *get_host_dn(LDAP *ld) {
-	char *dn;
+	char *dn, *c;
 	int fail, n;
+	char host_name[HOST_NAME_MAX];
 
 	fail = gethostname(host_name, HOST_NAME_MAX);
 	if (fail) return NULL;
 
 	if ( atoi(cfg[CFG_SHORTEN]) ) {
-		shorten_name(host_name, HOST_NAME_MAX);
+		/* remove domain parts from hostname */
+		for (c = host_name; c < host_name + HOST_NAME_MAX; c++) {
+			if (*c == '.') {
+				*c = 0;
+				break;
+			}
+		}
 		if (debug) {
 			pam_syslog(pam, LOG_DEBUG,
 					"Short host name is %s", host_name);
@@ -209,6 +163,7 @@ inline static LDAP *ldap_connect() {
 	LDAP *ld;
 	struct berval cred;
 	const int version3 = LDAP_VERSION3;
+	char *binddn;
 
 	rc = ldap_initialize(&ld, cfg[CFG_LDAP_URI]);
 	if (rc != LDAP_SUCCESS) {
@@ -223,16 +178,17 @@ inline static LDAP *ldap_connect() {
 		return NULL;
 	}
 
-	cred.bv_val = my_config.ldap_pw;
-	cred.bv_len = my_config.ldap_pw ? strlen(my_config.ldap_pw) : 0;
+	binddn =      *(char *) cfg[CFG_LDAP_DN] ? cfg[CFG_LDAP_DN] : NULL;
+	cred.bv_val = *(char *) cfg[CFG_LDAP_PW] ? cfg[CFG_LDAP_PW] : NULL;
+	cred.bv_len = cred.bv_val ? strlen(cred.bv_val) : 0;
 
-	rc = ldap_sasl_bind_s(ld, my_config.ldap_dn, LDAP_SASL_SIMPLE, &cred,
+	rc = ldap_sasl_bind_s(ld, binddn, LDAP_SASL_SIMPLE, &cred,
 			NULL, NULL, NULL);
 	if (rc == LDAP_SUCCESS) {
 		return ld;
 	} else {
 		pam_syslog(pam, LOG_ERR, "Unable to bind to LDAP at %s: %s",
-				my_config.ldap_uri, ldap_err2string(rc));
+				cfg[CFG_LDAP_URI], ldap_err2string(rc));
 		return NULL;
 	}
 }
@@ -284,14 +240,20 @@ end:
 
 /* printf arguments into LDAP filter */
 char *interpolate_filter(const char *filt_templ, const char *a, const char *b) {
-	char *result;
+	char *result, *safe_a, *safe_b;
 	size_t len = strlen(filt_templ);
 
-	if (a) len += strlen(a);
-	if (b) len += strlen(b);
+	if (a) {
+		safe_a = ldap_escape_filter(a);
+		len += strlen(safe_a);
+	}
+	if (b) {
+		safe_b = ldap_escape_filter(b);
+		len += strlen(safe_b);
+	}
 
 	result = (char *) malloc(++len);
-	snprintf(result, len, filt_templ, a, b);
+	snprintf(result, len, filt_templ, safe_a, safe_b);
 	if (debug) {
 		pam_syslog(pam, LOG_DEBUG,
 				"Interpolated search filter '%s'", result);
@@ -370,7 +332,6 @@ int user_permitted(LDAP *ld, const char *user_dn, const char *host_dn) {
 
 int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 		int argc, const char **argv) {
-	char host_name[HOST_NAME_MAX];
 	const char *user_name;
 	char *user_dn, *host_dn;
 	LDAP *ld;
@@ -405,19 +366,19 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 	ld = ldap_connect();
 	if (!ld) return PAM_AUTH_ERR;
 
+	/* get user DN */
 	char *user_filter = interpolate_filter(cfg[CFG_USR_FILT], user_name, NULL);
 	int user_scope = get_scope(cfg[CFG_USR_SCOPE]);
-	/* TODO */
 	rc = get_single_dn(ld, cfg[CFG_USR_BASE], user_scope, user_filter, &user_dn);
 	switch (rc) {
 		case 1:
 			break;
 		case 0:
-			pam_syslog(pam, LOG_WARNING, "Unable to find the DN for %s", my_config.user);
+			pam_syslog(pam, LOG_WARNING, "Unable to find the DN for %s", user_name);
 			result = PAM_USER_UNKNOWN;
 			goto end_ldap;
 		default:
-			pam_syslog(pam, LOG_ERR, "Multiple DN found for %s", my_config.user);
+			pam_syslog(pam, LOG_ERR, "Multiple DN found for %s", user_name);
 			result = PAM_AUTH_ERR;
 			goto end_ldap;
 	}
@@ -449,23 +410,23 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 		result = PAM_AUTH_ERR;
 		goto end_ldap;
 	}
+
 	/* check if access permitted */
 	result = user_permitted(ld, user_dn, host_dn);
-
 	switch (result) {
 		case PAM_SUCCESS:
 			if (debug) {
 				pam_syslog(pam, LOG_DEBUG,
-						"%s is permitted on %s", user_name, host_name);
+						"%s is permitted", user_name);
 			}
 			break;
 		case PAM_PERM_DENIED:
 			pam_syslog(pam, LOG_WARNING,
-					"%s is not permitted on %s", user_name, host_name);
+					"%s is not permitted", user_name);
 			break;
 		case PAM_AUTH_ERR:
 			pam_syslog(pam, LOG_ERR,
-					"Failed to test if %s is permitted on %s", user_name, host_name);
+					"Failed to test if %s is permitted", user_name);
 	}
 
 end_ldap:
@@ -473,6 +434,5 @@ end_ldap:
 	if (user_dn) ldap_memfree(user_dn);
 	if (host_dn) ldap_memfree(host_dn);
 	free(user_filter);
-	free(host_filter);
 	return result;
 }
