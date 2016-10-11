@@ -301,9 +301,10 @@ int user_permitted(LDAP *ld, char *user_dn) {
 		goto end;
 	}
 
-	interpolate_filter(&my_config.membership, user_dn, host_dn);
+	char *filter = interpolate_filter(cfg[CFG_MEMB_FILT], user_dn, host_dn);
+	int scope = get_scope(cfg[CFG_MEMB_SCOPE]);
 
-	rc = ldap_search_ext_s(ld, my_config.membership.base, my_config.membership.scope, my_config.membership.filter, no_attrs,
+	rc = ldap_search_ext_s(ld, cfg[CFG_MEMB_BASE], scope, filter, no_attrs,
 			1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
 	if (rc != LDAP_SUCCESS) {
 		pam_syslog(pam, LOG_ERR, "LDAP search '%s' failed: %s",
@@ -316,6 +317,7 @@ int user_permitted(LDAP *ld, char *user_dn) {
 end:
 	if (host_dn) ldap_memfree(host_dn);
 	if (res) ldap_msgfree(res);
+	free(filter);
 	return result;
 }
 
@@ -385,7 +387,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 		return PAM_AUTH_ERR;
 	}
 
-	interpolate_filter(&my_config.user, user_name, NULL);
+	char *user_filter = interpolate_filter(cfg[CFG_USR_FILT], user_name, NULL);
 	rc = get_single_dn(ld, &my_config.user, &user_dn);
 	if (rc != 1) {
 		if (rc) {
@@ -435,7 +437,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 		}
 	}
 
-	interpolate_filter(&my_config.host, host_name, NULL);
+	char *host_filter = interpolate_filter(cfg[CFG_HOST_FILT], host_name, NULL);
 
 	/* check if access permitted */
 	result = user_permitted(ld, user_dn);
@@ -459,5 +461,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 end_ldap:
 	ldap_unbind_ext(ld, NULL, NULL);
 	if (user_dn) ldap_memfree(user_dn);
+	free(user_filter);
+	free(host_filter);
 	return result;
 }
