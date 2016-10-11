@@ -224,7 +224,7 @@ end:
 }
 
 /* printf arguments into LDAP filter */
-const char *interpolate_filter(const char *filt_templ, const char *a, const char *b) {
+char *interpolate_filter(const char *filt_templ, const char *a, const char *b) {
 	char *result;
 	size_t len = strlen(filt_templ);
 
@@ -267,14 +267,14 @@ static inline int get_scope(const char *scope_str) {
 int is_super_admin(LDAP *ld, char *user_dn) {
 	int rc, result = PAM_AUTH_ERR;
 	LDAPMessage *res = NULL;
+	char *filter = interpolate_filter(cfg[CFG_ADM_FILT], user_dn, NULL);
+	int scope = get_scope(cfg[CFG_ADM_FILT]);
 
-	interpolate_filter(&my_config.admin, user_dn, NULL);
-
-	rc = ldap_search_ext_s(ld, my_config.admin.base, my_config.admin.scope, my_config.admin.filter,
+	rc = ldap_search_ext_s(ld, cfg[CFG_ADM_BASE], scope, filter,
 			no_attrs, 1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
 	if (rc != LDAP_SUCCESS) {
 		pam_syslog(pam, LOG_ERR, "LDAP search '%s' failed: %s",
-				my_config.admin.filter, ldap_err2string(rc));
+				filter, ldap_err2string(rc));
 		goto end;
 	}
 
@@ -282,6 +282,7 @@ int is_super_admin(LDAP *ld, char *user_dn) {
 
 end:
 	if (res) ldap_msgfree(res);
+	free(filter);
 	return result;
 }
 
