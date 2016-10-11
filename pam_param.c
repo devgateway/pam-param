@@ -241,6 +241,24 @@ const char *interpolate_filter(const char *filt_templ, const char *a, const char
 	return result;
 }
 
+static inline int get_scope(const char *scope_str) {
+	typedef struct {
+		const char *kw;
+		const int val;
+	} scope_type;
+	static scope_type scopes[] = {
+		{"sub",  LDAP_SCOPE_SUB},
+		{"one",  LDAP_SCOPE_ONE},
+		{"base", LDAP_SCOPE_BASE}
+	};
+
+	int i;
+	for (i = 0; i < sizeof(scopes); i++) {
+		if (strcasecmp(scope_str, scopes[i].kw) == 0)
+			return scopes[i].val;
+	}
+}
+
 /* returns:
  * PAM_SUCCESS if user is super admin;
  * PAM_IGNORE if not;
