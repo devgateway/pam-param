@@ -180,6 +180,63 @@ void shorten_name(char *host_name, int len) {
 	}
 }
 
+inline static char *get_host_dn(LDAP *ld) {
+	char *dn;
+	int fail, n;
+
+	fail = gethostname(host_name, HOST_NAME_MAX);
+	if (fail) return NULL;
+
+	if ( atoi(cfg[CFG_SHORTEN]) ) {
+		shorten_name(host_name, HOST_NAME_MAX);
+		if (debug) {
+			pam_syslog(pam, LOG_DEBUG,
+					"Short host name is %s", host_name);
+		}
+	}
+
+	char *filter = interpolate_filter(cfg[CFG_HOST_FILT], host_name, NULL);
+	int scope = get_scope(cfg[CFG_HOST_SCOPE]);
+
+	get_single_dn(ld, cfg[CFG_HOST_BASE], scope, filter, &dn);
+
+	free(filter);
+	return dn;
+}
+
+inline static LDAP *ldap_connect() {
+	int rc;
+	LDAP *ld;
+	struct berval cred;
+	const int version3 = LDAP_VERSION3;
+
+	rc = ldap_initialize(&ld, cfg[CFG_LDAP_URI]);
+	if (rc != LDAP_SUCCESS) {
+		pam_syslog(pam, LOG_ERR, "Unable to initialize LDAP library: %s",
+				strerror(errno));
+		return NULL;
+	}
+
+	rc = ldap_set_option(ld, LDAP_OPT_PROTOCOL_VERSION, &version3);
+	if (rc != LDAP_OPT_SUCCESS) {
+		pam_syslog(pam, LOG_ERR, "Unable to request LDAPv3 protocol");
+		return NULL;
+	}
+
+	cred.bv_val = my_config.ldap_pw;
+	cred.bv_len = my_config.ldap_pw ? strlen(my_config.ldap_pw) : 0;
+
+	rc = ldap_sasl_bind_s(ld, my_config.ldap_dn, LDAP_SASL_SIMPLE, &cred,
+			NULL, NULL, NULL);
+	if (rc == LDAP_SUCCESS) {
+		return ld;
+	} else {
+		pam_syslog(pam, LOG_ERR, "Unable to bind to LDAP at %s: %s",
+				my_config.ldap_uri, ldap_err2string(rc));
+		return NULL;
+	}
+}
+
 /* runs an LDAP query, and returns the DN of a single result;
  * fails if more than one result found (collision);
  * returns number of entries found */
@@ -362,30 +419,8 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 	}
 
 	/* connect to LDAP */
-	rc = ldap_initialize(&ld, my_config.ldap_uri);
-	if (rc != LDAP_SUCCESS) {
-		pam_syslog(pam, LOG_ERR, "Unable to initialize LDAP library: %s",
-				strerror(errno));
-		return PAM_AUTH_ERR;
-	}
-
-	const int version = LDAP_VERSION3;
-	rc = ldap_set_option(ld, LDAP_OPT_PROTOCOL_VERSION, &version);
-	if (rc != LDAP_OPT_SUCCESS) {
-		pam_syslog(pam, LOG_ERR, "Unable to request LDAPv3 protocol");
-		return PAM_AUTH_ERR;
-	}
-
-	cred.bv_val = my_config.ldap_pw;
-	cred.bv_len = my_config.ldap_pw ? strlen(my_config.ldap_pw) : 0;
-
-	rc = ldap_sasl_bind_s(ld, my_config.ldap_dn, LDAP_SASL_SIMPLE, &cred,
-			NULL, NULL, NULL);
-	if (rc != LDAP_SUCCESS) {
-		pam_syslog(pam, LOG_ERR, "Unable to bind to LDAP at %s: %s",
-				my_config.ldap_uri, ldap_err2string(rc));
-		return PAM_AUTH_ERR;
-	}
+	ld = ldap_connect();
+	if (!ld) return PAM_AUTH_ERR;
 
 	char *user_filter = interpolate_filter(cfg[CFG_USR_FILT], user_name, NULL);
 	rc = get_single_dn(ld, &my_config.user, &user_dn);
@@ -421,26 +456,14 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 			goto end_ldap;
 	}
 
-	/* get host name */
-	rc = gethostname(host_name, HOST_NAME_MAX);
-	if (rc) {
+	host_dn = get_host_dn(ld);
+	if (!host_dn) {
 		pam_syslog(pam, LOG_ERR, "Unable to determine host name");
 		result = PAM_AUTH_ERR;
 		goto end_ldap;
 	}
-
-	if (my_config.short_name) {
-		shorten_name(host_name, HOST_NAME_MAX);
-		if (debug) {
-			pam_syslog(pam, LOG_DEBUG,
-					"Short host name is %s", host_name);
-		}
-	}
-
-	char *host_filter = interpolate_filter(cfg[CFG_HOST_FILT], host_name, NULL);
-
 	/* check if access permitted */
-	result = user_permitted(ld, user_dn);
+	result = user_permitted(ld, user_dn, host_dn);
 
 	switch (result) {
 		case PAM_SUCCESS:
@@ -461,6 +484,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 end_ldap:
 	ldap_unbind_ext(ld, NULL, NULL);
 	if (user_dn) ldap_memfree(user_dn);
+	if (host_dn) ldap_memfree(host_dn);
 	free(user_filter);
 	free(host_filter);
 	return result;
