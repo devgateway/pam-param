@@ -380,23 +380,15 @@ end:
 	return result;
 }
 
-int read_config() {
-	memset((void *) &cfg, 0, sizeof(cfg));
-	return ini_parse(CONFIG_FILE, handler, NULL);
-}
-
 int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 		int argc, const char **argv) {
 	char host_name[HOST_NAME_MAX];
 	const char *user_name;
-	char *user_dn;
+	char *user_dn, *host_dn;
 	LDAP *ld;
-	struct berval cred;
-	int result = PAM_AUTH_ERR, rc, i;
+	int result = PAM_AUTH_ERR, rc, i, success, fail;
 
 	pam = pamh;
-
-	memset((void *) &my_config, 0, sizeof(my_config));
 
 	for (i = 0; i < argc; i++) {
 		if (!strcmp(argv[i], "debug")) {
@@ -405,8 +397,9 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 		}
 	}
 
-	rc = read_config();
-	if (rc) {
+	memset((void *) &cfg, 0, sizeof(cfg));
+	fail = ini_parse(CONFIG_FILE, handler, NULL);
+	if (fail) {
 		pam_syslog(pam, LOG_CRIT, "Unable to parse ini file");
 		return PAM_AUTH_ERR;
 	}
