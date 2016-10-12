@@ -150,12 +150,14 @@ inline static char *get_host_dn(LDAP *ld) {
 		}
 	}
 
-	char *filter = interpolate_filter(cfg[CFG_HOST_FILT], host_name, NULL);
+	char *safe_host_name = ldap_escape_filter(host_name);
+	char *filter = interpolate_filter(cfg[CFG_HOST_FILT], host_name);
 	int scope = get_scope(cfg[CFG_HOST_SCOPE]);
 
 	get_single_dn(ld, cfg[CFG_HOST_BASE], scope, filter, &dn);
 
 	free(filter);
+	free(safe_host_name);
 	return dn;
 }
 
@@ -294,7 +296,8 @@ static inline int get_scope(const char *scope_str) {
 int is_super_admin(LDAP *ld, char *user_dn) {
 	int rc, result = PAM_AUTH_ERR;
 	LDAPMessage *res = NULL;
-	char *filter = interpolate_filter(cfg[CFG_ADM_FILT], user_dn, NULL);
+	char *safe_user_dn = ldap_escape_filter(user_dn);
+	char *filter = interpolate_filter(cfg[CFG_ADM_FILT], safe_user_dn);
 	int scope = get_scope(cfg[CFG_ADM_FILT]);
 
 	rc = ldap_search_ext_s(ld, cfg[CFG_ADM_BASE], scope, filter,
@@ -307,6 +310,7 @@ int is_super_admin(LDAP *ld, char *user_dn) {
 	}
 
 	if (res) ldap_msgfree(res);
+	free(safe_user_dn);
 	free(filter);
 	return result;
 }
@@ -319,7 +323,10 @@ int user_permitted(LDAP *ld, const char *user_dn, const char *host_dn) {
 	int rc, result = PAM_AUTH_ERR;
 	LDAPMessage *res;
 
-	char *filter = interpolate_filter(cfg[CFG_MEMB_FILT], user_dn, host_dn);
+	char *safe_user_dn = ldap_escape_filter(user_dn);
+	char *safe_host_dn = ldap_escape_filter(host_dn);
+	char *filter = interpolate_filter(cfg[CFG_MEMB_FILT],
+			safe_user_dn, safe_host_dn);
 	int scope = get_scope(cfg[CFG_MEMB_SCOPE]);
 
 	rc = ldap_search_ext_s(ld, cfg[CFG_MEMB_BASE], scope, filter, no_attrs,
@@ -332,6 +339,8 @@ int user_permitted(LDAP *ld, const char *user_dn, const char *host_dn) {
 	}
 
 	if (res) ldap_msgfree(res);
+	free(safe_user_dn);
+	free(safe_host_dn);
 	free(filter);
 	return result;
 }
@@ -373,7 +382,8 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 	if (!ld) return PAM_AUTH_ERR;
 
 	/* get user DN */
-	char *user_filter = interpolate_filter(cfg[CFG_USR_FILT], user_name, NULL);
+	char *safe_user_name = ldap_escape_filter(user_name);
+	char *user_filter = interpolate_filter(cfg[CFG_USR_FILT], user_name);
 	int user_scope = get_scope(cfg[CFG_USR_SCOPE]);
 	rc = get_single_dn(ld, cfg[CFG_USR_BASE], user_scope, user_filter, &user_dn);
 	switch (rc) {
@@ -440,5 +450,6 @@ end_ldap:
 	if (user_dn) ldap_memfree(user_dn);
 	if (host_dn) ldap_memfree(host_dn);
 	free(user_filter);
+	free(safe_user_name);
 	return result;
 }
