@@ -3,6 +3,7 @@
 #include <limits.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <sys/types.h>
 #include <ldap.h>
 #include <lber.h>
@@ -40,7 +41,7 @@ int handler(void *user, const char *section,
 inline static char *get_host_dn(LDAP *ld);
 inline static LDAP *ldap_connect();
 int get_single_dn(LDAP *ld, const char *base, int scope, const char *filter, char **dn);
-char *interpolate_filter(const char *filt_templ, const char *a, const char *b);
+char *interpolate_filter(const char *filt_templ, ...);
 static inline int get_scope(const char *scope_str);
 int is_super_admin(LDAP *ld, char *user_dn);
 int user_permitted(LDAP *ld, const char *user_dn, const char *host_dn);
@@ -239,26 +240,31 @@ end:
 }
 
 /* printf arguments into LDAP filter */
-char *interpolate_filter(const char *filt_templ, const char *a, const char *b) {
-	char *result, *safe_a, *safe_b;
-	size_t len = strlen(filt_templ);
+char *interpolate_filter(const char *filt_templ, ...) {
+	char *result;
+	const char *c;
+	size_t len;
+	va_list ap, ap_original;
 
-	if (a) {
-		safe_a = ldap_escape_filter(a);
-		len += strlen(safe_a);
-	}
-	if (b) {
-		safe_b = ldap_escape_filter(b);
-		len += strlen(safe_b);
+	va_start(ap, filt_templ);
+	va_copy(ap_original, ap);
+
+	len = strlen(filt_templ);
+	for (c = filt_templ; *c; c++) {
+		if (*c == '%' && *(c + 1) == '%') {
+			len += strlen(va_arg(ap, char *));
+		}
 	}
 
 	result = (char *) malloc(++len);
-	snprintf(result, len, filt_templ, safe_a, safe_b);
+	vsnprintf(result, len, filt_templ, ap_original);
 	if (debug) {
 		pam_syslog(pam, LOG_DEBUG,
 				"Interpolated search filter '%s'", result);
 	}
 
+	va_end(ap);
+	va_end(ap_original);
 	return result;
 }
 
