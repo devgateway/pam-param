@@ -35,16 +35,16 @@ typedef enum {
   CFG_MEMB_FILT
 } cfg_index;
 
-char *ldap_escape_filter(const char *filter);
-int handler(void *user, const char *section,
-		const char *name, const char *value);
-inline static char *get_host_dn(LDAP *ld);
-inline static LDAP *ldap_connect();
-int get_single_dn(LDAP *ld, const char *base, int scope, const char *filter, char **dn);
-char *interpolate_filter(const char *filt_templ, ...);
+static char *ldap_escape_filter(const char *filter);
+static int ini_callback(void *user, const char *section, const char *name, const char *value);
+static inline char *get_host_dn(LDAP *ld);
+static inline LDAP *ldap_connect();
+static int get_single_dn(LDAP *ld, const char *base, int scope, const char *filter, char **dn);
+static char *interpolate_filter(const char *filt_templ, ...);
 static inline int get_scope(const char *scope_str);
-int is_super_admin(LDAP *ld, char *user_dn);
-int user_permitted(LDAP *ld, const char *user_dn, const char *host_dn);
+static inline int authorize_admin(LDAP *ld, char *user_dn);
+static inline int authorize_user(LDAP *ld, const char *user_dn, const char *host_dn);
+static inline int read_config();
 
 char *no_attrs[] = { LDAP_NO_ATTRS, NULL };
 int debug = 0;
@@ -55,7 +55,7 @@ char *cfg[10];
  * This function is based on PHP implementation of ldap_escape.
  * See LICENSE-php for copyright info.
  */
-char *ldap_escape_filter(const char *filter) {
+static char *ldap_escape_filter(const char *filter) {
 	char map[256] = {0};
 	char unsafe[] = "\\*()\0";
 	char hex[] = "0123456789abcdef";
@@ -90,7 +90,7 @@ char *ldap_escape_filter(const char *filter) {
 }
 
 /* callback for ini parser */
-int handler(void *user, const char *section,
+static int ini_callback(void *user, const char *section,
 		const char *name, const char *value) {
 	typedef struct {
 		const char *section;
@@ -128,7 +128,7 @@ int handler(void *user, const char *section,
 	return 1;
 }
 
-inline static char *get_host_dn(LDAP *ld) {
+static inline char *get_host_dn(LDAP *ld) {
 	char *dn, *c;
 	int fail, n;
 	char host_name[HOST_NAME_MAX];
@@ -161,7 +161,7 @@ inline static char *get_host_dn(LDAP *ld) {
 	return dn;
 }
 
-inline static LDAP *ldap_connect() {
+static inline LDAP *ldap_connect() {
 	int rc;
 	LDAP *ld;
 	struct berval cred;
@@ -199,7 +199,7 @@ inline static LDAP *ldap_connect() {
 /* runs an LDAP query, and returns the DN of a single result;
  * fails if more than one result found (collision);
  * returns number of entries found */
-int get_single_dn(LDAP *ld, const char *base, int scope, const char *filter, char **dn) {
+static int get_single_dn(LDAP *ld, const char *base, int scope, const char *filter, char **dn) {
 	int rc, n_items = 0;
 	LDAPMessage *res = NULL;
 	LDAPMessage *first;
@@ -242,7 +242,7 @@ end:
 }
 
 /* printf arguments into LDAP filter */
-char *interpolate_filter(const char *filt_templ, ...) {
+static char *interpolate_filter(const char *filt_templ, ...) {
 	char *result;
 	const char *c;
 	size_t len;
@@ -293,7 +293,7 @@ static inline int get_scope(const char *scope_str) {
  * PAM_IGNORE if not;
  * PAM_USER_UNKNOWN if user DN not found;
  * PAM_AUTH_ERR if search failed or collision found */
-int is_super_admin(LDAP *ld, char *user_dn) {
+static inline int authorize_admin(LDAP *ld, char *user_dn) {
 	int rc, result = PAM_AUTH_ERR;
 	LDAPMessage *res = NULL;
 	char *safe_user_dn = ldap_escape_filter(user_dn);
@@ -319,7 +319,8 @@ int is_super_admin(LDAP *ld, char *user_dn) {
  * PAM_SUCCESS if user is permitted;
  * PAM_PERM_DENIED if not;
  * PAM_AUTH_ERR if search failed or collision found */
-int user_permitted(LDAP *ld, const char *user_dn, const char *host_dn) {
+static inline int authorize_user(LDAP *ld,
+		const char *user_dn, const char *host_dn) {
 	int rc, result = PAM_AUTH_ERR;
 	LDAPMessage *res;
 
@@ -345,12 +346,21 @@ int user_permitted(LDAP *ld, const char *user_dn, const char *host_dn) {
 	return result;
 }
 
+/* return true on success */
+inline int read_config() {
+	memset((void *) &cfg, 0, sizeof(cfg));
+	int fail = ini_parse(CONFIG_FILE, ini_callback, NULL);
+	if (fail)
+		pam_syslog(pam, LOG_CRIT, "Unable to parse ini file");
+	return !fail;
+}
+
 int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 		int argc, const char **argv) {
 	const char *user_name;
 	char *user_dn, *host_dn;
 	LDAP *ld;
-	int result = PAM_AUTH_ERR, rc, i, success, fail;
+	int result = PAM_AUTH_ERR, rc, i, success;
 
 	pam = pamh;
 
@@ -361,12 +371,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 		}
 	}
 
-	memset((void *) &cfg, 0, sizeof(cfg));
-	fail = ini_parse(CONFIG_FILE, handler, NULL);
-	if (fail) {
-		pam_syslog(pam, LOG_CRIT, "Unable to parse ini file");
-		return PAM_AUTH_ERR;
-	}
+	if (!read_config) return PAM_AUTH_ERR;
 
 	/* get user name from PAM */
 	rc = pam_get_item(pamh, PAM_USER, (const void **) &user_name);
@@ -400,7 +405,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 	}
 
 	/* check if is super admin */
-	result = is_super_admin(ld, user_dn);
+	result = authorize_admin(ld, user_dn);
 	switch (result) {
 		case PAM_SUCCESS:
 			if (debug) {
@@ -428,7 +433,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 	}
 
 	/* check if access permitted */
-	result = user_permitted(ld, user_dn, host_dn);
+	result = authorize_user(ld, user_dn, host_dn);
 	switch (result) {
 		case PAM_SUCCESS:
 			if (debug) {
@@ -451,5 +456,6 @@ end_ldap:
 	if (host_dn) ldap_memfree(host_dn);
 	free(user_filter);
 	free(safe_user_name);
+
 	return result;
 }
