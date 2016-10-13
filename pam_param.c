@@ -253,7 +253,7 @@ static char *interpolate_filter(const char *filt_templ, ...) {
 
 	len = strlen(filt_templ);
 	for (c = filt_templ; *c; c++) {
-		if (*c == '%' && *(c + 1) == '%') {
+		if (*c == '%' && *(c + 1) != '%') { /* not '%%', but format sequence */
 			len += strlen(va_arg(ap, char *));
 		}
 	}
