@@ -115,7 +115,8 @@ static int ini_callback(void *user, const char *section,
 		{"host",   "scope",       CFG_HOST_SCOPE},
 		{"host",   "filter",      CFG_HOST_FILT},
 	};
-	static size_t n_lines = sizeof(cfg_lines);
+	const size_t n_lines =
+		sizeof(cfg_lines) / sizeof(cfg_lines[0]);
 	int i;
 
 	for (i = 0; i < n_lines; i++) {
