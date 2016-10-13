@@ -87,6 +87,7 @@ static char *ldap_escape_filter(const char *filter) {
 	}
 
 	result[p++] = '\0';
+	return result;
 }
 
 /* callback for ini parser */
