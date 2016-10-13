@@ -371,7 +371,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 		}
 	}
 
-	if (!read_config) return PAM_AUTH_ERR;
+	if ( !read_config() ) return PAM_AUTH_ERR;
 
 	/* get user name from PAM */
 	rc = pam_get_item(pamh, PAM_USER, (const void **) &user_name);
