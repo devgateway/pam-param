@@ -58,19 +58,19 @@ char *cfg[10];
  */
 static char *ldap_escape_filter(const char *filter) {
 	char map[256] = {0};
-	char unsafe[] = "\\*()\0";
-	char hex[] = "0123456789abcdef";
+	const char unsafe[] = "\\*()\0";
+	const char hex[] = "0123456789abcdef";
 	char *result;
-	int i, p = 0;
+	int i = 0, p = 0;
 	size_t len = 1;
 
 	/* map unsafe character */
-	while ( i < sizeof(unsafe) ) {
+	for (i = 0; i < sizeof(unsafe) / sizeof(unsafe[0]); i++) {
 		map[(unsigned char) unsafe[i++]] = 1;
 	}
 
 	/* count required memory for the result string */
-	for (i = 0; i < sizeof(unsafe); i++) {
+	for (i = 0; i < sizeof(unsafe) / sizeof(unsafe[0]); i++) {
 		len += (map[(unsigned char) filter[i]]) ? 3 : 1;
 	}
 
@@ -277,7 +277,7 @@ static inline int get_scope(const char *scope_str) {
 	};
 
 	int i;
-	for (i = 0; i < sizeof(scopes); i++) {
+	for (i = 0; i < sizeof(scopes) / sizeof(scopes[0]); i++) {
 		if (strcasecmp(scope_str, scopes[i].kw) == 0)
 			return scopes[i].val;
 	}
