@@ -293,7 +293,7 @@ static inline int authorize_admin(LDAP *ld, char *user_dn) {
 	LDAPMessage *res = NULL;
 	char *safe_user_dn = ldap_escape_filter(user_dn);
 	char *filter = interpolate_filter(cfg[CFG_ADM_FILT], safe_user_dn);
-	int scope = get_scope(cfg[CFG_ADM_FILT]);
+	int scope = get_scope(cfg[CFG_ADM_SCOPE]);
 
 	rc = ldap_search_ext_s(ld, cfg[CFG_ADM_BASE], scope, filter,
 			no_attrs, 1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
