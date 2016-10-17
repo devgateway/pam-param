@@ -58,19 +58,19 @@ char *cfg[10];
  */
 static char *ldap_escape_filter(const char *filter) {
 	char map[256] = {0};
-	char unsafe[] = "\\*()\0";
-	char hex[] = "0123456789abcdef";
+	const char unsafe[] = "\\*()\0";
+	const char hex[] = "0123456789abcdef";
 	char *result;
-	int i, p = 0;
+	int i = 0, p = 0;
 	size_t len = 1;
 
 	/* map unsafe character */
-	while ( i < sizeof(unsafe) ) {
+	for (i = 0; i < sizeof(unsafe) / sizeof(unsafe[0]); i++) {
 		map[(unsigned char) unsafe[i++]] = 1;
 	}
 
 	/* count required memory for the result string */
-	for (i = 0; i < sizeof(unsafe); i++) {
+	for (i = 0; i < sizeof(unsafe) / sizeof(unsafe[0]); i++) {
 		len += (map[(unsigned char) filter[i]]) ? 3 : 1;
 	}
 
@@ -88,6 +88,7 @@ static char *ldap_escape_filter(const char *filter) {
 	}
 
 	result[p++] = '\0';
+	return result;
 }
 
 /* callback for ini parser */
@@ -116,7 +117,8 @@ static int ini_callback(void *user, const char *section,
 		{"host",   "scope",       CFG_HOST_SCOPE},
 		{"host",   "filter",      CFG_HOST_FILT},
 	};
-	static size_t n_lines = sizeof(cfg_lines);
+	const size_t n_lines =
+		sizeof(cfg_lines) / sizeof(cfg_lines[0]);
 	int i;
 
 	for (i = 0; i < n_lines; i++) {
@@ -275,7 +277,7 @@ static inline int get_scope(const char *scope_str) {
 	};
 
 	int i;
-	for (i = 0; i < sizeof(scopes); i++) {
+	for (i = 0; i < sizeof(scopes) / sizeof(scopes[0]); i++) {
 		if (strcasecmp(scope_str, scopes[i].kw) == 0)
 			return scopes[i].val;
 	}
@@ -291,7 +293,7 @@ static inline int authorize_admin(LDAP *ld, char *user_dn) {
 	LDAPMessage *res = NULL;
 	char *safe_user_dn = ldap_escape_filter(user_dn);
 	char *filter = interpolate_filter(cfg[CFG_ADM_FILT], safe_user_dn);
-	int scope = get_scope(cfg[CFG_ADM_FILT]);
+	int scope = get_scope(cfg[CFG_ADM_SCOPE]);
 
 	rc = ldap_search_ext_s(ld, cfg[CFG_ADM_BASE], scope, filter,
 			no_attrs, 1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
@@ -364,7 +366,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 		}
 	}
 
-	if (!read_config) return PAM_AUTH_ERR;
+	if ( !read_config() ) return PAM_AUTH_ERR;
 
 	/* get user name from PAM */
 	rc = pam_get_item(pamh, PAM_USER, (const void **) &user_name);
