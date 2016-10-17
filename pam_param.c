@@ -1,4 +1,5 @@
 #define _XOPEN_SOURCE 700
+#define _GNU_SOURCE
 
 #include <limits.h>
 #include <unistd.h>
@@ -243,30 +244,22 @@ end:
 
 /* printf arguments into LDAP filter */
 static char *interpolate_filter(const char *filt_templ, ...) {
-	char *result;
-	const char *c;
-	size_t len;
-	va_list ap, ap_original;
+	char *result = NULL;
+	va_list ap;
 
 	va_start(ap, filt_templ);
-	va_copy(ap_original, ap);
 
-	len = strlen(filt_templ);
-	for (c = filt_templ; *c; c++) {
-		if (*c == '%' && *(c + 1) == '%') {
-			len += strlen(va_arg(ap, char *));
+	if ( vasprintf(&result, filt_templ, ap) >= 0 ) {
+		if (debug) {
+			pam_syslog(pam, LOG_DEBUG,
+					"Interpolated search filter '%s'", result);
 		}
-	}
-
-	result = (char *) malloc(++len);
-	vsnprintf(result, len, filt_templ, ap_original);
-	if (debug) {
-		pam_syslog(pam, LOG_DEBUG,
-				"Interpolated search filter '%s'", result);
+	} else {
+		result = NULL;
 	}
 
 	va_end(ap);
-	va_end(ap_original);
+
 	return result;
 }
 
