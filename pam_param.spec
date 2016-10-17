@@ -35,14 +35,16 @@ cmake \
 	-DCONFIGFILE:FILE=%{_secconfdir}/%name.ini \
 	-DMODULEDIR:PATH=%{_moduledir} \
 	-DSBINDIR:PATH=%_sbindir \
-	-DSECCONFDIR:PATH=%{_secconfdir} \
-	-DPAMCONFDIR:PATH=%{_pamconfdir} \
 	-DCMAKE_BUILD_TYPE=RelWithDebInfo \
 	.
 make
 
 %install
 make DESTDIR=%buildroot install
+mkdir -p %buildroot%{_secconfdir}
+install -m 0600 samples/pam_param.ini %buildroot%{_secconfdir}/
+mkdir -p %buildroot%{_pamconfdir}
+install -m 0644 samples/pam_param_test.pamd %buildroot%{_pamconfdir}/pam_param_test
 
 %files
 %{_moduledir}/*

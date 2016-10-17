@@ -3,8 +3,6 @@ project(pam_param C)
 
 set(MODULEDIR  /usr/lib/security  CACHE PATH "PAM module path")
 set(SBINDIR    /usr/sbin          CACHE PATH "Privileged user binary path")
-set(SECCONFDIR /etc/security      CACHE PATH "Security config path")
-set(PAMCONFDIR /etc/pam.d         CACHE PATH "PAM config path")
 set(CONFIGFILE /etc/pam_param.ini CACHE FILE "Module configuration file")
 
 find_path(PAM_INCLUDE NAMES "pam_modules.h" PATH_SUFFIXES "security" "pam")
@@ -27,9 +25,3 @@ install(TARGETS pam_param pam_param_test
 	RUNTIME DESTINATION "${SBINDIR}"
 	LIBRARY DESTINATION "${MODULEDIR}"
 	NAMELINK_SKIP)
-install(FILES "samples/pam_param.ini"
-	DESTINATION "${SECCONFDIR}"
-	PERMISSIONS OWNER_WRITE OWNER_READ)
-install(FILES "samples/pam_param_test.pamd"
-	DESTINATION "${PAMCONFDIR}"
-	RENAME "pam_param_test")
