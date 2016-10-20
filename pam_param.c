@@ -383,7 +383,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 
 	/* get user DN */
 	char *safe_user_name = ldap_escape_filter(user_name);
-	char *user_filter = interpolate_filter(cfg[CFG_USR_FILT], user_name);
+	char *user_filter = interpolate_filter(cfg[CFG_USR_FILT], safe_user_name);
 	int user_scope = get_scope(cfg[CFG_USR_SCOPE]);
 	rc = get_single_dn(ld, cfg[CFG_USR_BASE], user_scope, user_filter, &user_dn);
 	switch (rc) {
