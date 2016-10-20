@@ -289,11 +289,13 @@ static inline int get_scope(const char *scope_str) {
  * PAM_USER_UNKNOWN if user DN not found;
  * PAM_AUTH_ERR if search failed or collision found */
 static inline int authorize_admin(LDAP *ld, char *user_dn) {
-	int rc, result = PAM_AUTH_ERR;
+	int rc, result = PAM_AUTH_ERR, scope;
 	LDAPMessage *res = NULL;
-	char *safe_user_dn = ldap_escape_filter(user_dn);
-	char *filter = interpolate_filter(cfg[CFG_ADM_FILT], safe_user_dn);
-	int scope = get_scope(cfg[CFG_ADM_SCOPE]);
+	char *safe_user_dn = NULL, *filter = NULL;
+
+	scope = get_scope(cfg[CFG_ADM_SCOPE]);
+	safe_user_dn = ldap_escape_filter(user_dn);
+	filter = interpolate_filter(cfg[CFG_ADM_FILT], safe_user_dn);
 
 	rc = ldap_search_ext_s(ld, cfg[CFG_ADM_BASE], scope, filter,
 			no_attrs, 1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
@@ -306,6 +308,34 @@ static inline int authorize_admin(LDAP *ld, char *user_dn) {
 
 	if (res) ldap_msgfree(res);
 	free(safe_user_dn);
+	free(filter);
+	return result;
+}
+
+static inline int get_user_dn(LDAP *ld, char *raw_username, char **dn) {
+	char *username = NULL, *filter = NULL;
+	int scope, result, rc;
+
+	username = ldap_escape_filter(raw_username);
+	filter = interpolate_filter(cfg[CFG_USR_FILT], username);
+	scope = get_scope(cfg[CFG_USR_SCOPE]);
+
+	rc = get_single_dn(ld, cfg[CFG_USR_BASE], scope, filter, dn);
+	switch (rc) {
+		case 1:
+			result = PAM_SUCCESS;
+			break;
+		case 0:
+			pam_syslog(pam, LOG_WARNING, "Unable to find the DN for %s", raw_username);
+			result = PAM_USER_UNKNOWN;
+			goto end;
+		default:
+			pam_syslog(pam, LOG_ERR, "Multiple DN found for %s", raw_username);
+			result = PAM_AUTH_ERR;
+			goto end;
+	}
+end:
+	free(username);
 	free(filter);
 	return result;
 }
@@ -342,7 +372,7 @@ static inline int authorize_user(LDAP *ld,
 }
 
 /* return true on success */
-inline int read_config() {
+static inline int read_config() {
 	memset((void *) &cfg, 0, sizeof(cfg));
 	int fail = ini_parse(CONFIG_FILE, ini_callback, NULL);
 	if (fail)
@@ -353,8 +383,8 @@ inline int read_config() {
 int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 		int argc, const char **argv) {
 	const char *user_name;
-	char *user_dn, *host_dn;
-	LDAP *ld;
+	char *user_dn = NULL, *host_dn = NULL;
+	LDAP *ld = NULL;
 	int result = PAM_AUTH_ERR, rc, i, success;
 
 	pam = pamh;
@@ -382,22 +412,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 	if (!ld) return PAM_AUTH_ERR;
 
 	/* get user DN */
-	char *safe_user_name = ldap_escape_filter(user_name);
-	char *user_filter = interpolate_filter(cfg[CFG_USR_FILT], safe_user_name);
-	int user_scope = get_scope(cfg[CFG_USR_SCOPE]);
-	rc = get_single_dn(ld, cfg[CFG_USR_BASE], user_scope, user_filter, &user_dn);
-	switch (rc) {
-		case 1:
-			break;
-		case 0:
-			pam_syslog(pam, LOG_WARNING, "Unable to find the DN for %s", user_name);
-			result = PAM_USER_UNKNOWN;
-			goto end_ldap;
-		default:
-			pam_syslog(pam, LOG_ERR, "Multiple DN found for %s", user_name);
-			result = PAM_AUTH_ERR;
-			goto end_ldap;
-	}
+	if (get_user_dn(ld, user_name, &user_dn) != PAM_SUCCESS) goto end_ldap;
 
 	/* check if is super admin */
 	result = authorize_admin(ld, user_dn);
@@ -449,8 +464,6 @@ end_ldap:
 	ldap_unbind_ext(ld, NULL, NULL);
 	if (user_dn) ldap_memfree(user_dn);
 	if (host_dn) ldap_memfree(host_dn);
-	free(user_filter);
-	free(safe_user_name);
 
 	return result;
 }
