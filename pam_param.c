@@ -92,7 +92,7 @@ static char *ldap_escape_filter(const char *filter) {
 
 	/* map unsafe character */
 	for (i = 0; i < sizeof(unsafe) / sizeof(unsafe[0]); i++) {
-		map[(unsigned char) unsafe[i++]] = 1;
+		map[(unsigned char) unsafe[i]] = 1;
 	}
 
 	/* count required memory for the result string */
