@@ -369,7 +369,13 @@ static inline int authorize_user(const char *raw_user_dn, const char *raw_host_d
 	rc = ldap_search_ext_s(ld, cfg[CFG_MEMB_BASE], scope, filter, no_attrs,
 			1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
 	if (rc == LDAP_SUCCESS) {
-		result = ldap_count_entries(ld, res) ? PAM_SUCCESS : PAM_PERM_DENIED;
+		if (ldap_count_entries(ld, res)) {
+			result = PAM_SUCCESS;
+			if (debug) pam_syslog(pam, LOG_DEBUG, "%s is permitted", raw_user_dn);
+		} else {
+			result = PAM_PERM_DENIED;
+			if (debug) pam_syslog(pam, LOG_WARNING, "%s is not permitted", raw_user_dn);
+		}
 	} else {
 		pam_syslog(pam, LOG_ERR, "LDAP search '%s' failed: %s",
 				filter, ldap_err2string(rc));
@@ -434,21 +440,6 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 
 	/* check if access permitted */
 	result = authorize_user(user_dn, host_dn);
-	switch (result) {
-		case PAM_SUCCESS:
-			if (debug) {
-				pam_syslog(pam, LOG_DEBUG,
-						"%s is permitted", user_name);
-			}
-			break;
-		case PAM_PERM_DENIED:
-			pam_syslog(pam, LOG_WARNING,
-					"%s is not permitted", user_name);
-			break;
-		case PAM_AUTH_ERR:
-			pam_syslog(pam, LOG_ERR,
-					"Failed to test if %s is permitted", user_name);
-	}
 
 end_ldap:
 	ldap_unbind_ext(ld, NULL, NULL);
