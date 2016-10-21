@@ -42,7 +42,6 @@ static inline int get_host_dn(char **dn);
 static inline int get_user_dn(const char *raw_username, char **dn);
 static inline LDAP *ldap_connect();
 static int get_single_dn(const char *base, int scope, const char *filter, char **dn);
-static char *interpolate_filter(const char *filt_templ, ...);
 static inline int get_scope(const char *scope_str);
 static inline int authorize_admin(char *user_dn);
 static inline int authorize_user(const char *user_dn, const char *host_dn);
@@ -134,15 +133,15 @@ static int ini_callback(void *user, const char *section,
 }
 
 static inline int get_host_dn(char **dn) {
-	char *c, host_name[HOST_NAME_MAX], *safe_host_name = NULL, *filter = NULL;
-	int fail, scope, n, result;
+	char *c, raw_host_name[HOST_NAME_MAX], *host_name = NULL, *filter = NULL;
+	int fail, scope, n, result, rc;
 
 	if (!cfg[CFG_HOST_BASE]) {
 		pam_syslog(pam, LOG_ERR, "Host LDAP search base not set");
 		return PAM_AUTH_ERR;
 	}
 
-	fail = gethostname(host_name, HOST_NAME_MAX);
+	fail = gethostname(raw_host_name, HOST_NAME_MAX);
 	if (fail) {
 		pam_syslog(pam, LOG_ERR, "Unable to determine host name");
 		return PAM_AUTH_ERR;
@@ -150,24 +149,30 @@ static inline int get_host_dn(char **dn) {
 
 	if ( atoi(cfg[CFG_SHORTEN]) ) {
 		/* remove domain parts from hostname */
-		for (c = host_name; c < host_name + HOST_NAME_MAX; c++) {
+		for (c = raw_host_name; c < raw_host_name + HOST_NAME_MAX; c++) {
 			if (*c == '.') {
 				*c = 0;
 				break;
 			}
 		}
-		if (debug) pam_syslog(pam, LOG_DEBUG, "Short host name %s", host_name);
+		if (debug) pam_syslog(pam, LOG_DEBUG, "Short host name %s", raw_host_name);
 	}
 
-	safe_host_name = ldap_escape_filter(host_name);
-	filter = interpolate_filter(cfg[CFG_HOST_FILT], safe_host_name);
+	host_name = ldap_escape_filter(host_name);
+	rc = asprintf(&filter, cfg[CFG_HOST_FILT], host_name);
+	if (rc == -1) {
+		filter = NULL;
+		result = PAM_AUTH_ERR;
+		goto end;
+	}
 	scope = get_scope(cfg[CFG_HOST_SCOPE]);
 
 	n = get_single_dn(cfg[CFG_HOST_BASE], scope, filter, dn);
 	result = (n == 1) ? PAM_SUCCESS : PAM_AUTH_ERR;
 
+end:
 	if (filter) free(filter);
-	if (safe_host_name) free(safe_host_name);
+	if (host_name) free(host_name);
 	return result;
 }
 
@@ -250,27 +255,6 @@ end:
 	return n_items;
 }
 
-/* printf arguments into LDAP filter */
-static char *interpolate_filter(const char *filt_templ, ...) {
-	char *result = NULL;
-	va_list ap;
-
-	va_start(ap, filt_templ);
-
-	if ( vasprintf(&result, filt_templ, ap) >= 0 ) {
-		if (debug) {
-			pam_syslog(pam, LOG_DEBUG,
-					"Interpolated search filter '%s'", result);
-		}
-	} else {
-		result = NULL;
-	}
-
-	va_end(ap);
-
-	return result;
-}
-
 static inline int get_scope(const char *scope_str) {
 	typedef struct {
 		const char *kw;
@@ -301,7 +285,12 @@ static inline int authorize_admin(char *raw_dn) {
 
 	scope = get_scope(cfg[CFG_ADM_SCOPE]);
 	dn = ldap_escape_filter(raw_dn);
-	filter = interpolate_filter(cfg[CFG_ADM_FILT], dn);
+	rc = asprintf(&filter, cfg[CFG_ADM_FILT], dn);
+	if (rc == -1) {
+		filter = NULL;
+		result = PAM_AUTH_ERR;
+		goto end;
+	}
 
 	rc = ldap_search_ext_s(ld, cfg[CFG_ADM_BASE], scope, filter,
 			no_attrs, 1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
@@ -318,6 +307,7 @@ static inline int authorize_admin(char *raw_dn) {
 				filter, ldap_err2string(rc));
 	}
 
+end:
 	if (res) ldap_msgfree(res);
 	free(dn);
 	free(filter);
@@ -329,8 +319,13 @@ static inline int get_user_dn(const char *raw_username, char **dn) {
 	int scope, result, rc;
 
 	username = ldap_escape_filter(raw_username);
-	filter = interpolate_filter(cfg[CFG_USR_FILT], username);
 	scope = get_scope(cfg[CFG_USR_SCOPE]);
+	rc = asprintf(&filter, cfg[CFG_USR_FILT], username);
+	if (rc == -1) {
+		filter = NULL;
+		result = PAM_AUTH_ERR;
+		goto end;
+	}
 
 	rc = get_single_dn(cfg[CFG_USR_BASE], scope, filter, dn);
 	switch (rc) {
@@ -348,7 +343,7 @@ static inline int get_user_dn(const char *raw_username, char **dn) {
 	}
 end:
 	free(username);
-	free(filter);
+	if (filter) free(filter);
 	return result;
 }
 
@@ -363,7 +358,12 @@ static inline int authorize_user(const char *raw_user_dn, const char *raw_host_d
 
 	user_dn = ldap_escape_filter(raw_user_dn);
 	host_dn = ldap_escape_filter(raw_host_dn);
-	filter = interpolate_filter(cfg[CFG_MEMB_FILT], user_dn, host_dn);
+	rc = asprintf(&filter, cfg[CFG_MEMB_FILT], user_dn, host_dn);
+	if (rc == -1) {
+		filter = NULL;
+		result = PAM_AUTH_ERR;
+		goto end;
+	}
 	scope = get_scope(cfg[CFG_MEMB_SCOPE]);
 
 	rc = ldap_search_ext_s(ld, cfg[CFG_MEMB_BASE], scope, filter, no_attrs,
@@ -375,10 +375,11 @@ static inline int authorize_user(const char *raw_user_dn, const char *raw_host_d
 				filter, ldap_err2string(rc));
 	}
 
+end:
 	if (res) ldap_msgfree(res);
+	if (filter) free(filter);
 	free(user_dn);
 	free(host_dn);
-	free(filter);
 	return result;
 }
 
