@@ -131,13 +131,20 @@ static int ini_callback(void *user, const char *section,
 	return 1;
 }
 
-static inline char *get_host_dn(LDAP *ld) {
-	char *dn, *c;
-	int fail, n;
-	char host_name[HOST_NAME_MAX];
+static inline int get_host_dn(LDAP *ld, char **dn) {
+	char *c, host_name[HOST_NAME_MAX], *safe_host_name = NULL, *filter = NULL;
+	int fail, scope, n, result;
+
+	if (!cfg[CFG_HOST_BASE]) {
+		pam_syslog(pam, LOG_ERR, "Host LDAP search base not set");
+		return PAM_AUTH_ERR;
+	}
 
 	fail = gethostname(host_name, HOST_NAME_MAX);
-	if (fail) return NULL;
+	if (fail) {
+		pam_syslog(pam, LOG_ERR, "Unable to determine host name");
+		return PAM_AUTH_ERR;
+	}
 
 	if ( atoi(cfg[CFG_SHORTEN]) ) {
 		/* remove domain parts from hostname */
@@ -147,21 +154,19 @@ static inline char *get_host_dn(LDAP *ld) {
 				break;
 			}
 		}
-		if (debug) {
-			pam_syslog(pam, LOG_DEBUG,
-					"Short host name is %s", host_name);
-		}
+		if (debug) pam_syslog(pam, LOG_DEBUG, "Short host name %s", host_name);
 	}
 
-	char *safe_host_name = ldap_escape_filter(host_name);
-	char *filter = interpolate_filter(cfg[CFG_HOST_FILT], host_name);
-	int scope = get_scope(cfg[CFG_HOST_SCOPE]);
+	safe_host_name = ldap_escape_filter(host_name);
+	filter = interpolate_filter(cfg[CFG_HOST_FILT], safe_host_name);
+	scope = get_scope(cfg[CFG_HOST_SCOPE]);
 
-	get_single_dn(ld, cfg[CFG_HOST_BASE], scope, filter, &dn);
+	n = get_single_dn(ld, cfg[CFG_HOST_BASE], scope, filter, dn);
+	result = (n == 1) ? PAM_SUCCESS : PAM_AUTH_ERR;
 
-	free(filter);
-	free(safe_host_name);
-	return dn;
+	if (filter) free(filter);
+	if (safe_host_name) free(safe_host_name);
+	return result;
 }
 
 static inline LDAP *ldap_connect() {
@@ -424,12 +429,8 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 	result = authorize_admin(ld, user_dn);
 	if (result != PAM_IGNORE) goto end_ldap;
 
-	host_dn = get_host_dn(ld);
-	if (!host_dn) {
-		pam_syslog(pam, LOG_ERR, "Unable to determine host name");
-		result = PAM_AUTH_ERR;
-		goto end_ldap;
-	}
+	result = get_host_dn(ld, &host_dn);
+	if (result != PAM_SUCCESS) goto end_ldap;
 
 	/* check if access permitted */
 	result = authorize_user(ld, user_dn, host_dn);
