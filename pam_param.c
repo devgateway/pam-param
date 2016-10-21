@@ -288,26 +288,32 @@ static inline int get_scope(const char *scope_str) {
  * PAM_IGNORE if not;
  * PAM_USER_UNKNOWN if user DN not found;
  * PAM_AUTH_ERR if search failed or collision found */
-static inline int authorize_admin(LDAP *ld, char *user_dn) {
+static inline int authorize_admin(LDAP *ld, char *raw_dn) {
 	int rc, result = PAM_AUTH_ERR, scope;
 	LDAPMessage *res = NULL;
-	char *safe_user_dn = NULL, *filter = NULL;
+	char *dn = NULL, *filter = NULL;
 
 	scope = get_scope(cfg[CFG_ADM_SCOPE]);
-	safe_user_dn = ldap_escape_filter(user_dn);
-	filter = interpolate_filter(cfg[CFG_ADM_FILT], safe_user_dn);
+	dn = ldap_escape_filter(raw_dn);
+	filter = interpolate_filter(cfg[CFG_ADM_FILT], dn);
 
 	rc = ldap_search_ext_s(ld, cfg[CFG_ADM_BASE], scope, filter,
 			no_attrs, 1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
 	if (rc == LDAP_SUCCESS) {
-		result = ldap_count_entries(ld, res) ? PAM_SUCCESS : PAM_IGNORE;
+		if (ldap_count_entries(ld, res)) {
+			result = PAM_SUCCESS;
+			if (debug) pam_syslog(pam, LOG_DEBUG, "%s is a super admin", raw_dn);
+		} else {
+			result = PAM_IGNORE;
+			if (debug) pam_syslog(pam, LOG_DEBUG, "%s is not a super admin", raw_dn);
+		}
 	} else {
 		pam_syslog(pam, LOG_ERR, "LDAP search '%s' failed: %s",
 				filter, ldap_err2string(rc));
 	}
 
 	if (res) ldap_msgfree(res);
-	free(safe_user_dn);
+	free(dn);
 	free(filter);
 	return result;
 }
@@ -416,24 +422,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 
 	/* check if is super admin */
 	result = authorize_admin(ld, user_dn);
-	switch (result) {
-		case PAM_SUCCESS:
-			if (debug) {
-				pam_syslog(pam, LOG_DEBUG,
-						"%s is a super admin", user_name);
-			}
-			goto end_ldap;
-		case PAM_IGNORE:
-			if (debug) {
-				pam_syslog(pam, LOG_DEBUG,
-						"%s is not a super admin, continuing", user_name);
-			}
-			break;
-		default:
-			pam_syslog(pam, LOG_ERR,
-					"Failed to test if %s is a super admin", user_name);
-			goto end_ldap;
-	}
+	if (result != PAM_IGNORE) goto end_ldap;
 
 	host_dn = get_host_dn(ld);
 	if (!host_dn) {
