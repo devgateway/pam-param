@@ -36,6 +36,12 @@ typedef enum {
   CFG_MEMB_FILT
 } cfg_index;
 
+typedef struct {
+	const char *section;
+	const char *name;
+	cfg_index index;
+} cfg_line;
+
 static char *ldap_escape_filter(const char *filter);
 static int ini_callback(void *user, const char *section, const char *name, const char *value);
 static inline int get_host_dn(char **dn);
@@ -52,6 +58,25 @@ int debug = 0;
 pam_handle_t *pam = NULL;
 LDAP *ld = NULL;
 char *cfg[10];
+cfg_line cfg_lines[] = {
+	{"",           "short_name", CFG_SHORTEN},
+	{"ldap",       "uri",        CFG_LDAP_URI},
+	{"ldap",       "binddn",     CFG_LDAP_DN},
+	{"ldap",       "bindpw",     CFG_LDAP_PW},
+	{"admin",      "base",       CFG_ADM_BASE},
+	{"admin",      "scope",      CFG_ADM_SCOPE},
+	{"admin",      "filter",     CFG_ADM_FILT},
+	{"user",       "base",       CFG_USR_BASE},
+	{"user",       "scope",      CFG_USR_SCOPE},
+	{"user",       "filter",     CFG_USR_FILT},
+	{"host",       "base",       CFG_HOST_BASE},
+	{"host",       "scope",      CFG_HOST_SCOPE},
+	{"host",       "filter",     CFG_HOST_FILT},
+	{"membership", "base",       CFG_MEMB_BASE},
+	{"membership", "scope",      CFG_MEMB_SCOPE},
+	{"membership", "filter",     CFG_MEMB_FILT},
+};
+const size_t n_lines = sizeof(cfg_lines) / sizeof(cfg_lines[0]);
 
 /*
  * This function is based on PHP implementation of ldap_escape.
@@ -95,31 +120,6 @@ static char *ldap_escape_filter(const char *filter) {
 /* callback for ini parser */
 static int ini_callback(void *user, const char *section,
 		const char *name, const char *value) {
-	typedef struct {
-		const char *section;
-		const char *name;
-		cfg_index index;
-	} cfg_line;
-	static cfg_line cfg_lines[] = {
-		{"",       "short_name",  CFG_SHORTEN},
-		{"ldap",   "uri",         CFG_LDAP_URI},
-		{"ldap",   "binddn",      CFG_LDAP_DN},
-		{"ldap",   "bindpw",      CFG_LDAP_PW},
-		{"admin",  "base",        CFG_ADM_BASE},
-		{"admin",  "scope",       CFG_ADM_SCOPE},
-		{"admin",  "filter",      CFG_ADM_FILT},
-		{"user",   "base",        CFG_USR_BASE},
-		{"user",   "scope",       CFG_USR_SCOPE},
-		{"user",   "filter",      CFG_USR_FILT},
-		{"host",   "base",        CFG_HOST_BASE},
-		{"host",   "scope",       CFG_HOST_SCOPE},
-		{"host",   "filter",      CFG_HOST_FILT},
-		{"host",   "base",        CFG_HOST_BASE},
-		{"host",   "scope",       CFG_HOST_SCOPE},
-		{"host",   "filter",      CFG_HOST_FILT},
-	};
-	const size_t n_lines =
-		sizeof(cfg_lines) / sizeof(cfg_lines[0]);
 	int i;
 
 	for (i = 0; i < n_lines; i++) {
@@ -391,10 +391,22 @@ end:
 
 /* return true on success */
 static inline int read_config() {
+	int fail, i;
+
 	memset((void *) &cfg, 0, sizeof(cfg));
-	int fail = ini_parse(CONFIG_FILE, ini_callback, NULL);
-	if (fail)
-		pam_syslog(pam, LOG_CRIT, "Unable to parse ini file");
+
+	fail = ini_parse(CONFIG_FILE, ini_callback, NULL);
+	if (fail) pam_syslog(pam, LOG_CRIT, "Unable to parse ini file");
+
+	for (i = 0; i < n_lines; i++) {
+		if ( !cfg[cfg_lines[i].index] ) {
+			pam_syslog(pam, LOG_CRIT,
+					CONFIG_FILE ": missing setting '%s' in section '%s'",
+					cfg_lines[i].name, cfg_lines[i].section);
+			return 1;
+		}
+	}
+end:
 	return !fail;
 }
 
