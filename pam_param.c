@@ -38,18 +38,20 @@ typedef enum {
 
 static char *ldap_escape_filter(const char *filter);
 static int ini_callback(void *user, const char *section, const char *name, const char *value);
-static inline char *get_host_dn(LDAP *ld);
+static inline int get_host_dn(char **dn);
+static inline int get_user_dn(const char *raw_username, char **dn);
 static inline LDAP *ldap_connect();
-static int get_single_dn(LDAP *ld, const char *base, int scope, const char *filter, char **dn);
+static int get_single_dn(const char *base, int scope, const char *filter, char **dn);
 static char *interpolate_filter(const char *filt_templ, ...);
 static inline int get_scope(const char *scope_str);
-static inline int authorize_admin(LDAP *ld, char *user_dn);
-static inline int authorize_user(LDAP *ld, const char *user_dn, const char *host_dn);
+static inline int authorize_admin(char *user_dn);
+static inline int authorize_user(const char *user_dn, const char *host_dn);
 static inline int read_config();
 
 char *no_attrs[] = { LDAP_NO_ATTRS, NULL };
 int debug = 0;
 pam_handle_t *pam = NULL;
+LDAP *ld = NULL;
 char *cfg[10];
 
 /*
@@ -131,7 +133,7 @@ static int ini_callback(void *user, const char *section,
 	return 1;
 }
 
-static inline int get_host_dn(LDAP *ld, char **dn) {
+static inline int get_host_dn(char **dn) {
 	char *c, host_name[HOST_NAME_MAX], *safe_host_name = NULL, *filter = NULL;
 	int fail, scope, n, result;
 
@@ -161,7 +163,7 @@ static inline int get_host_dn(LDAP *ld, char **dn) {
 	filter = interpolate_filter(cfg[CFG_HOST_FILT], safe_host_name);
 	scope = get_scope(cfg[CFG_HOST_SCOPE]);
 
-	n = get_single_dn(ld, cfg[CFG_HOST_BASE], scope, filter, dn);
+	n = get_single_dn(cfg[CFG_HOST_BASE], scope, filter, dn);
 	result = (n == 1) ? PAM_SUCCESS : PAM_AUTH_ERR;
 
 	if (filter) free(filter);
@@ -171,7 +173,6 @@ static inline int get_host_dn(LDAP *ld, char **dn) {
 
 static inline LDAP *ldap_connect() {
 	int rc;
-	LDAP *ld;
 	struct berval cred;
 	const int version3 = LDAP_VERSION3;
 	char *binddn;
@@ -207,7 +208,7 @@ static inline LDAP *ldap_connect() {
 /* runs an LDAP query, and returns the DN of a single result;
  * fails if more than one result found (collision);
  * returns number of entries found */
-static int get_single_dn(LDAP *ld, const char *base, int scope, const char *filter, char **dn) {
+static int get_single_dn(const char *base, int scope, const char *filter, char **dn) {
 	int rc, n_items = 0;
 	LDAPMessage *res = NULL;
 	LDAPMessage *first;
@@ -293,7 +294,7 @@ static inline int get_scope(const char *scope_str) {
  * PAM_IGNORE if not;
  * PAM_USER_UNKNOWN if user DN not found;
  * PAM_AUTH_ERR if search failed or collision found */
-static inline int authorize_admin(LDAP *ld, char *raw_dn) {
+static inline int authorize_admin(char *raw_dn) {
 	int rc, result = PAM_AUTH_ERR, scope;
 	LDAPMessage *res = NULL;
 	char *dn = NULL, *filter = NULL;
@@ -323,7 +324,7 @@ static inline int authorize_admin(LDAP *ld, char *raw_dn) {
 	return result;
 }
 
-static inline int get_user_dn(LDAP *ld, char *raw_username, char **dn) {
+static inline int get_user_dn(const char *raw_username, char **dn) {
 	char *username = NULL, *filter = NULL;
 	int scope, result, rc;
 
@@ -331,7 +332,7 @@ static inline int get_user_dn(LDAP *ld, char *raw_username, char **dn) {
 	filter = interpolate_filter(cfg[CFG_USR_FILT], username);
 	scope = get_scope(cfg[CFG_USR_SCOPE]);
 
-	rc = get_single_dn(ld, cfg[CFG_USR_BASE], scope, filter, dn);
+	rc = get_single_dn(cfg[CFG_USR_BASE], scope, filter, dn);
 	switch (rc) {
 		case 1:
 			result = PAM_SUCCESS;
@@ -355,8 +356,7 @@ end:
  * PAM_SUCCESS if user is permitted;
  * PAM_PERM_DENIED if not;
  * PAM_AUTH_ERR if search failed or collision found */
-static inline int authorize_user(LDAP *ld,
-		const char *user_dn, const char *host_dn) {
+static inline int authorize_user(const char *user_dn, const char *host_dn) {
 	int rc, result = PAM_AUTH_ERR;
 	LDAPMessage *res;
 
@@ -395,7 +395,6 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 		int argc, const char **argv) {
 	const char *user_name;
 	char *user_dn = NULL, *host_dn = NULL;
-	LDAP *ld = NULL;
 	int result = PAM_AUTH_ERR, rc, i, success;
 
 	pam = pamh;
@@ -423,17 +422,17 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 	if (!ld) return PAM_AUTH_ERR;
 
 	/* get user DN */
-	if (get_user_dn(ld, user_name, &user_dn) != PAM_SUCCESS) goto end_ldap;
+	if (get_user_dn(user_name, &user_dn) != PAM_SUCCESS) goto end_ldap;
 
 	/* check if is super admin */
-	result = authorize_admin(ld, user_dn);
+	result = authorize_admin(user_dn);
 	if (result != PAM_IGNORE) goto end_ldap;
 
-	result = get_host_dn(ld, &host_dn);
+	result = get_host_dn(&host_dn);
 	if (result != PAM_SUCCESS) goto end_ldap;
 
 	/* check if access permitted */
-	result = authorize_user(ld, user_dn, host_dn);
+	result = authorize_user(user_dn, host_dn);
 	switch (result) {
 		case PAM_SUCCESS:
 			if (debug) {
