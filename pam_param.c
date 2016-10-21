@@ -158,7 +158,7 @@ static inline int get_host_dn(char **dn) {
 		if (debug) pam_syslog(pam, LOG_DEBUG, "Short host name %s", raw_host_name);
 	}
 
-	host_name = ldap_escape_filter(host_name);
+	host_name = ldap_escape_filter(raw_host_name);
 	rc = asprintf(&filter, cfg[CFG_HOST_FILT], host_name);
 	if (rc == -1) {
 		filter = NULL;
