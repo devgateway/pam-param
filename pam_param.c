@@ -356,15 +356,15 @@ end:
  * PAM_SUCCESS if user is permitted;
  * PAM_PERM_DENIED if not;
  * PAM_AUTH_ERR if search failed or collision found */
-static inline int authorize_user(const char *user_dn, const char *host_dn) {
-	int rc, result = PAM_AUTH_ERR;
+static inline int authorize_user(const char *raw_user_dn, const char *raw_host_dn) {
+	int rc, result = PAM_AUTH_ERR, scope;
 	LDAPMessage *res;
+	char *user_dn, *host_dn, *filter;
 
-	char *safe_user_dn = ldap_escape_filter(user_dn);
-	char *safe_host_dn = ldap_escape_filter(host_dn);
-	char *filter = interpolate_filter(cfg[CFG_MEMB_FILT],
-			safe_user_dn, safe_host_dn);
-	int scope = get_scope(cfg[CFG_MEMB_SCOPE]);
+	user_dn = ldap_escape_filter(raw_user_dn);
+	host_dn = ldap_escape_filter(raw_host_dn);
+	filter = interpolate_filter(cfg[CFG_MEMB_FILT], user_dn, host_dn);
+	scope = get_scope(cfg[CFG_MEMB_SCOPE]);
 
 	rc = ldap_search_ext_s(ld, cfg[CFG_MEMB_BASE], scope, filter, no_attrs,
 			1, NULL, NULL, NULL, LDAP_NO_LIMIT, &res);
@@ -376,8 +376,8 @@ static inline int authorize_user(const char *user_dn, const char *host_dn) {
 	}
 
 	if (res) ldap_msgfree(res);
-	free(safe_user_dn);
-	free(safe_host_dn);
+	free(user_dn);
+	free(host_dn);
 	free(filter);
 	return result;
 }
