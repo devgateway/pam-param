@@ -1,4 +1,4 @@
-.TH PAM_PARAM 8 "10/15/2016" "PAM Param module" "PAM Param module"
+.TH PAM_PARAM 8 "10/22/2016" "PAM Param module" "PAM Param module"
 .SH NAME
 pam_param \- PAM module for configurable LDAP account lookups
 .SH SYNOPSIS
@@ -26,17 +26,24 @@ User is allowed to log in, because either:
 .IP -
 they are a member of super administrators group in LDAP; or
 .IP -
-the user and the host DNs are both members at least one object in LDAP.
+the user and the host DNs are both members of one or more objects in LDAP.
 .RE
 .TP
 .BR PAM_USER_UNKNOWN
 Current username was not found in LDAP.
 .TP
+.BR PAM_SERVICE_ERR
+.RS
+Module failed for one of the following reasons:
+.IP -
+invalid arguments given to the module;
+.IP -
+the module could not read or parse the configuration file.
+.RE
+.TP
 .BR PAM_AUTH_ERR
 .RS
 Authentication couldn't be performed for one of the following reasons:
-.IP -
-the module could not read or parse the configuration file;
 .IP -
 the module was unable to search LDAP;
 .IP -
@@ -47,6 +54,11 @@ in LDAP.
 .BR PAM_PERM_DENIED
 .RS
 The user was found in LDAP, but is not permitted access this host.
+.RE
+.TP
+.BR PAM_BUF_ERR
+.RS
+Unable to allocate memory.
 .SH EXAMPLES
 Todo
 .SH "SEE ALSO"
