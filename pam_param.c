@@ -114,7 +114,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char *argv[]
 	if (!ld) return PAM_AUTH_ERR;
 
 	/* get user DN */
-	if (get_user_dn(user_name, &user_dn) != PAM_SUCCESS) goto end_ldap;
+	if (get_user_dn(username, &user_dn) != PAM_SUCCESS) goto end_ldap;
 
 	/* check if is super admin */
 	result = authorize_admin(user_dn);
