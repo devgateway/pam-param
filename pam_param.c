@@ -1,17 +1,15 @@
 #define _XOPEN_SOURCE 700
 #define _GNU_SOURCE
 
+#include <stdlib.h>
 #include <limits.h>
 #include <unistd.h>
-#include <stdlib.h>
-#include <stdarg.h>
 #include <sys/types.h>
 #include <ldap.h>
 #include <lber.h>
 #include <syslog.h>
 #include <pam_ext.h>
 #include <errno.h>
-#include <string.h>
 #include <strings.h>
 
 #include "pam_param.h"
@@ -42,22 +40,21 @@ typedef struct {
 	cfg_index index;
 } cfg_line;
 
-static char *ldap_escape_filter(const char *filter);
-static int ini_callback(void *user, const char *section, const char *name, const char *value);
-static inline int get_host_dn(char **dn);
-static inline int get_user_dn(const char *raw_username, char **dn);
+static char *ldap_escape_filter(const char *);
+static int ini_callback(void *, const char *, const char *, const char *);
+static inline int get_host_dn(char **);
+static inline int get_user_dn(const char *, char **);
 static inline LDAP *ldap_connect();
-static int get_single_dn(const char *base, int scope, const char *filter, char **dn);
-static inline int get_scope(const char *scope_str);
-static inline int authorize_admin(char *user_dn);
-static inline int authorize_user(const char *user_dn, const char *host_dn);
+static int get_single_dn(const char *, int, const char *, char **);
+static inline int get_scope(const char *);
+static inline int authorize_admin(char *);
+static inline int authorize_user(const char *, const char *);
 static inline int read_config();
 
 char *no_attrs[] = { LDAP_NO_ATTRS, NULL };
 int debug = 0;
 pam_handle_t *pam = NULL;
 LDAP *ld = NULL;
-char *cfg[10];
 cfg_line cfg_lines[] = {
 	{"",           "short_name", CFG_SHORTEN},
 	{"ldap",       "uri",        CFG_LDAP_URI},
@@ -76,14 +73,14 @@ cfg_line cfg_lines[] = {
 	{"membership", "scope",      CFG_MEMB_SCOPE},
 	{"membership", "filter",     CFG_MEMB_FILT},
 };
-const size_t n_lines = sizeof(cfg_lines) / sizeof(cfg_lines[0]);
+char *cfg[sizeof(cfg_lines) / sizeof(cfg_lines[0])] = { NULL };
 
 /*
  * This function is based on PHP implementation of ldap_escape.
  * See LICENSE-php for copyright info.
  */
 static char *ldap_escape_filter(const char *filter) {
-	char map[256] = {0};
+	char map[256] = { 0 };
 	const char unsafe[] = "\\*()\0";
 	const char hex[] = "0123456789abcdef";
 	char *result;
@@ -118,12 +115,12 @@ static char *ldap_escape_filter(const char *filter) {
 }
 
 /* callback for ini parser */
-static int ini_callback(void *user, const char *section,
-		const char *name, const char *value) {
+static int ini_callback(void *user, const char *section, const char *name, const char *value) {
 	int i;
+	const size_t n = sizeof(cfg) / sizeof(cfg[0]);
 
-	for (i = 0; i < n_lines; i++) {
-		if (	!(strcmp(section, cfg_lines[i].section) |
+	for (i = 0; i < n; i++) {
+		if ( !(strcmp(section, cfg_lines[i].section) |
 					  strcmp(name,    cfg_lines[i].name)) ) {
 			cfg[cfg_lines[i].index] = strdup(value);
 		}
@@ -392,13 +389,12 @@ end:
 /* return true on success */
 static inline int read_config() {
 	int fail, i;
-
-	memset((void *) &cfg, 0, sizeof(cfg));
+	const size_t n = sizeof(cfg) / sizeof(cfg[0]);
 
 	fail = ini_parse(CONFIG_FILE, ini_callback, NULL);
 	if (fail) pam_syslog(pam, LOG_CRIT, "Unable to parse ini file");
 
-	for (i = 0; i < n_lines; i++) {
+	for (i = 0; i < n; i++) {
 		if ( !cfg[cfg_lines[i].index] ) {
 			pam_syslog(pam, LOG_CRIT,
 					CONFIG_FILE ": missing setting '%s' in section '%s'",
@@ -410,8 +406,7 @@ end:
 	return !fail;
 }
 
-int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
-		int argc, const char **argv) {
+int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char **argv) {
 	const char *user_name;
 	char *user_dn = NULL, *host_dn = NULL;
 	int result = PAM_AUTH_ERR, rc, i, success;
@@ -429,9 +424,7 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags,
 
 	/* get user name from PAM */
 	rc = pam_get_item(pamh, PAM_USER, (const void **) &user_name);
-	if (rc != PAM_SUCCESS
-			|| user_name == NULL
-			|| *(const char *)user_name == '\0') {
+	if (rc != PAM_SUCCESS || user_name == NULL || *(const char *)user_name == '\0') {
 		pam_syslog(pam, LOG_NOTICE, "Cannot obtain the user name");
 		return PAM_USER_UNKNOWN;
 	}
