@@ -10,6 +10,20 @@ It's designed to look up role-based permissions in LDAP. It will determine
 DNs of the user and current host, then search for entries which have these
 DNs in their attributes, e.g. member. It also allows defining a search for
 super admin accounts which will have access to any host.
+.sp
+This module is not meant to replace \fBpam_ldap\fR(5) or
+\fBsssd-ldap\fR(5), but to complement them. Neither provides matrix-style
+checks for user and host. This module helps the administrator avoid
+manually creating entries of each user for each host.
+.sp
+The goal of this module is to have certain objects in LDAP, e.g. teams or
+projects, to which users and hosts belong. If both the user being
+authorized and the current host belong to one or more such objects, access
+is granted.
+.sp
+Access without such a check will be granted if the user belongs to a super
+administrator group. Such users shall be permitted access to any host,
+regardless of their team (project) membership.
 .SH OPTIONS
 .TP
 .BR debug
