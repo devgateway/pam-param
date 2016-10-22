@@ -42,10 +42,10 @@ typedef struct {
 
 static char *ldap_escape_filter(const char *);
 static int ini_callback(void *, const char *, const char *, const char *);
+static int search_dn(const char *, int, const char *, char **);
+static inline LDAP *ldap_connect();
 static inline int get_host_dn(char **);
 static inline int get_user_dn(const char *, char **);
-static inline LDAP *ldap_connect();
-static int get_single_dn(const char *, int, const char *, char **);
 static inline int get_scope(const char *);
 static inline int authorize_admin(char *);
 static inline int authorize_user(const char *, const char *);
@@ -78,7 +78,7 @@ char *cfg[sizeof(cfg_lines) / sizeof(cfg_lines[0])] = { NULL };
 /* Main library function: account management.
 	Args, returns: see pam_sm_acct_mgmt(3) */
 int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char *argv[]) {
-	const char *user_name;
+	const char *username;
 	char *user_dn = NULL, *host_dn = NULL;
 	int result = PAM_SERVICE_ERR, rc, i, success;
 
@@ -103,8 +103,8 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char *argv[]
 	if ( !read_config() ) return PAM_SERVICE_ERR;
 
 	/* get user name from PAM */
-	rc = pam_get_item(pamh, PAM_USER, (const void **) &user_name);
-	if (rc != PAM_SUCCESS || user_name == NULL || *(const char *)user_name == '\0') {
+	rc = pam_get_item(pamh, PAM_USER, (const void **) &username);
+	if (rc != PAM_SUCCESS || username == NULL || *(const char *)username == '\0') {
 		pam_syslog(pam, LOG_NOTICE, "Cannot obtain the user name");
 		return PAM_USER_UNKNOWN;
 	}
@@ -226,7 +226,7 @@ static inline int get_user_dn(const char *raw_username, char **dn) {
 	}
 
 	/* run LDAP search */
-	n = get_single_dn(cfg[CFG_USR_BASE], scope, filter, dn);
+	n = search_dn(cfg[CFG_USR_BASE], scope, filter, dn);
 	switch (n) {
 		case 1:
 			result = PAM_SUCCESS;
@@ -257,32 +257,32 @@ end:
 		PAM_USER_UNKNOWN - found no users
 		PAM_AUTH_ERR - multiple matching users found */
 static inline int get_host_dn(char **dn) {
-	char *c, raw_host_name[HOST_NAME_MAX], *host_name = NULL, *filter = NULL;
+	char *c, raw_hostname[HOST_NAME_MAX], *hostname = NULL, *filter = NULL;
 	int scope, n, result;
 
-	if ( gethostname(raw_host_name, HOST_NAME_MAX) ) {
+	if ( gethostname(raw_hostname, HOST_NAME_MAX) ) {
 		pam_syslog(pam, LOG_ERR, "Unable to determine hostname");
 		return PAM_SERVICE_ERR;
 	}
 
 	/* remove domain if FQDN */
 	if ( atoi(cfg[CFG_SHORTEN]) ) {
-		for (c = raw_host_name; c < raw_host_name + HOST_NAME_MAX; c++) {
+		for (c = raw_hostname; c < raw_hostname + HOST_NAME_MAX; c++) {
 			if (*c == '.') {
 				*c = 0;
 				break;
 			}
 		}
-		if (debug) pam_syslog(pam, LOG_DEBUG, "Short host name %s", raw_host_name);
+		if (debug) pam_syslog(pam, LOG_DEBUG, "Short host name %s", raw_hostname);
 	}
 
 	/* prepare LDAP search: scope & filter */
-	host_name = ldap_escape_filter(raw_host_name);
-	if (!host_name) return PAM_BUF_ERR;
+	hostname = ldap_escape_filter(raw_hostname);
+	if (!hostname) return PAM_BUF_ERR;
 
 	scope = get_scope(cfg[CFG_HOST_SCOPE]);
 
-	n = asprintf(&filter, cfg[CFG_HOST_FILT], host_name);
+	n = asprintf(&filter, cfg[CFG_HOST_FILT], hostname);
 	if (n == -1) {
 		filter = NULL;
 		result = PAM_BUF_ERR;
@@ -290,23 +290,23 @@ static inline int get_host_dn(char **dn) {
 	}
 
 	/* run LDAP search */
-	n = get_single_dn(cfg[CFG_HOST_BASE], scope, filter, dn);
+	n = search_dn(cfg[CFG_HOST_BASE], scope, filter, dn);
 	switch (n) {
 		case 1:
 			result = PAM_SUCCESS;
 			break;
 		case 0:
-			pam_syslog(pam, LOG_WARNING, "Unable to find the DN for %s", raw_host_name);
+			pam_syslog(pam, LOG_WARNING, "Unable to find the DN for %s", raw_hostname);
 			result = PAM_AUTH_ERR;
 			goto end;
 		default:
-			pam_syslog(pam, LOG_ERR, "Multiple DN found for %s", raw_host_name);
+			pam_syslog(pam, LOG_ERR, "Multiple DN found for %s", raw_hostname);
 			result = PAM_AUTH_ERR;
 			goto end;
 	}
 
 end:
-	free(host_name);
+	free(hostname);
 	if (filter) free(filter);
 	return result;
 }
@@ -338,7 +338,7 @@ static inline int authorize_admin(char *raw_dn) {
 	}
 
 	/* run LDAP search */
-	n = get_single_dn(cfg[CFG_ADM_BASE], scope, filter, NULL);
+	n = search_dn(cfg[CFG_ADM_BASE], scope, filter, NULL);
 	switch (n) {
 		case 0:
 			result = PAM_IGNORE;
@@ -387,7 +387,7 @@ static inline int authorize_user(const char *raw_user_dn, const char *raw_host_d
 	}
 
 	/* run LDAP search */
-	n = get_single_dn(cfg[CFG_MEMB_BASE], scope, filter, NULL);
+	n = search_dn(cfg[CFG_MEMB_BASE], scope, filter, NULL);
 	switch (n) {
 		case 0:
 			result = PAM_PERM_DENIED;
@@ -471,7 +471,7 @@ static int ini_callback(void *user, const char *section, const char *name, const
 		base, scope, filter - LDAP search parameters
 		dn - if not NULL, receives the single DN found, otherwise unchanged
 	Returns: number of entries found */
-static int get_single_dn(const char *base, int scope, const char *filter, char **dn) {
+static int search_dn(const char *base, int scope, const char *filter, char **dn) {
 	int rc, n = 0;
 	LDAPMessage *res = NULL;
 
