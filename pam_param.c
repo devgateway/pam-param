@@ -235,11 +235,10 @@ static inline int get_user_dn(const char *raw_username, char **dn) {
 		case 0:
 			pam_syslog(pam, LOG_WARNING, "Unable to find the DN for %s", raw_username);
 			result = PAM_USER_UNKNOWN;
-			goto end;
+			break;
 		default:
 			pam_syslog(pam, LOG_ERR, "Multiple DN found for %s", raw_username);
 			result = PAM_AUTH_ERR;
-			goto end;
 	}
 
 end:
@@ -299,11 +298,10 @@ static inline int get_host_dn(char **dn) {
 		case 0:
 			pam_syslog(pam, LOG_WARNING, "Unable to find the DN for %s", raw_hostname);
 			result = PAM_AUTH_ERR;
-			goto end;
+			break;
 		default:
 			pam_syslog(pam, LOG_ERR, "Multiple DN found for %s", raw_hostname);
 			result = PAM_AUTH_ERR;
-			goto end;
 	}
 
 end:
