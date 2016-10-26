@@ -74,7 +74,14 @@ The user was found in LDAP, but is not permitted access this host.
 .RS
 Unable to allocate memory.
 .SH EXAMPLES
-Todo
+.nf
+# check /etc/passwd first
+account [success=ok default=ignore] pam_localuser.so
+# permit system daemons
+account sufficient pam_succeed_if.so uid < 1000 quiet
+# check LDAP, ignore if it's down, deny otherwise
+account [success=ok service_err=ignore default=bad] pam_param.so
+.fi
 .SH "SEE ALSO"
 .PP
 \fBpam_param.ini\fR(5),
