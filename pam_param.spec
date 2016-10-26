@@ -10,7 +10,7 @@ BuildRequires:  cmake >= 2.8.11
 
 %package test
 Summary:        Test utility for %name PAM module
-Requires:				%name
+Requires:       %name
 
 %description
 This PAM module provides account service using configurable LDAP lookups. It's
@@ -42,7 +42,7 @@ make
 %install
 make DESTDIR=%buildroot install
 mkdir -p %buildroot%{_secconfdir}
-install -m 0600 samples/pam_param.ini %buildroot%{_secconfdir}/
+install -m 0660 samples/pam_param.ini %buildroot%{_secconfdir}/
 mkdir -p %buildroot%{_pamconfdir}
 install -m 0644 samples/pam_param_test.pamd %buildroot%{_pamconfdir}/pam_param_test
 
