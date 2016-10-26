@@ -1,3 +1,5 @@
+/* Copyright 2016 Development Gateway, Inc
+ * This file is part of pam_param, see COPYING */
 #include <stdio.h>
 #include <stdlib.h>
 #include <pam_appl.h>
