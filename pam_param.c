@@ -76,7 +76,7 @@ cfg_line cfg_lines[] = {
 char *cfg[sizeof(cfg_lines) / sizeof(cfg_lines[0])] = { NULL };
 
 /* Main library function: account management.
-	Args, returns: see pam_sm_acct_mgmt(3) */
+Args, returns: see pam_sm_acct_mgmt(3) */
 int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char *argv[]) {
 	const char *username;
 	char *user_dn = NULL, *host_dn = NULL;
@@ -136,7 +136,7 @@ end:
 }
 
 /* Read INI config.
-	Returns: non-zero on success */
+Returns: non-zero on success */
 static inline int read_config() {
 	int fail, i;
 	const size_t cfg_size = sizeof(cfg) / sizeof(cfg[0]);
@@ -162,7 +162,7 @@ end:
 }
 
 /* Connect and bind to LDAP.
-	Returns: LDAP handle or NULL */
+Returns: LDAP handle or NULL */
 static inline LDAP *ldap_connect() {
 	int rc;
 	struct berval cred;
@@ -201,14 +201,14 @@ static inline LDAP *ldap_connect() {
 }
 
 /* Determine LDAP DN from username.
-	Args:
-		raw_username - username as provided by PAM, must be escaped
-		dn - receives DN if found
-	Returns:
-		PAM_BUF_ERR - can't allocate memory
-		PAM_SUCCESS - found one user
-		PAM_USER_UNKNOWN - found no users
-		PAM_AUTH_ERR - multiple matching users found */
+Args:
+	raw_username - username as provided by PAM, must be escaped
+	dn - receives DN if found
+Returns:
+	PAM_BUF_ERR - can't allocate memory
+	PAM_SUCCESS - found one user
+	PAM_USER_UNKNOWN - found no users
+	PAM_AUTH_ERR - multiple matching users found */
 static inline int get_user_dn(const char *raw_username, char **dn) {
 	char *username = NULL, *filter = NULL;
 	int scope, result, n;
@@ -249,14 +249,14 @@ end:
 }
 
 /* Determine LDAP DN from hostname.
-	Args:
-		dn - receives DN if found
-	Returns:
-		PAM_BUF_ERR - can't allocate memory
-		PAM_SERVICE_ERR - can't determine hostname
-		PAM_SUCCESS - found one user
-		PAM_USER_UNKNOWN - found no users
-		PAM_AUTH_ERR - multiple matching users found */
+Args:
+	dn - receives DN if found
+Returns:
+	PAM_BUF_ERR - can't allocate memory
+	PAM_SERVICE_ERR - can't determine hostname
+	PAM_SUCCESS - found one user
+	PAM_USER_UNKNOWN - found no users
+	PAM_AUTH_ERR - multiple matching users found */
 static inline int get_host_dn(char **dn) {
 	char *c, raw_hostname[HOST_NAME_MAX], *hostname = NULL, *filter = NULL;
 	int scope, n, result;
@@ -313,14 +313,14 @@ end:
 }
 
 /* Check if the user is a member of super admins group in LDAP.
-	Args:
-		raw_dn - user DN, must be escaped
-	Returns:
-		PAM_BUF_ERR - can't allocate memory
-		PAM_SUCCESS - user is super admin
-		PAM_IGNORE - user is not super admin, module must continue
-		PAM_USER_UNKNOWN - user DN not found;
-		PAM_AUTH_ERR - search failed or multiple users found */
+Args:
+	raw_dn - user DN, must be escaped
+Returns:
+	PAM_BUF_ERR - can't allocate memory
+	PAM_SUCCESS - user is super admin
+	PAM_IGNORE - user is not super admin, module must continue
+	PAM_USER_UNKNOWN - user DN not found;
+	PAM_AUTH_ERR - search failed or multiple users found */
 static inline int authorize_admin(char *raw_dn) {
 	int n, rc, result = PAM_AUTH_ERR, scope;
 	char *dn = NULL, *filter = NULL;
@@ -357,12 +357,12 @@ end:
 }
 
 /* Check if the user and the host both belong to any object.
-	Args:
-		raw_user_dn, raw_host_dn - DNs, must be escaped
-	Returns:
-		PAM_BUF_ERR - can't allocate memory
-		PAM_SUCCESS - user is permitted
-		PAM_PERM_DENIED - user is not permitted */
+Args:
+	raw_user_dn, raw_host_dn - DNs, must be escaped
+Returns:
+	PAM_BUF_ERR - can't allocate memory
+	PAM_SUCCESS - user is permitted
+	PAM_PERM_DENIED - user is not permitted */
 static inline int authorize_user(const char *raw_user_dn, const char *raw_host_dn) {
 	int n, rc, result = PAM_AUTH_ERR, scope;
 	LDAPMessage *res;
@@ -407,12 +407,12 @@ end:
 }
 
 /* Escape a string to be used in search filter.
-	Args:
-		string - string to escape
-	Returns:
-		escaped string or NULL
-	Copyright:
-		This function is based on PHP implementation of ldap_escape, see LICENSE-php  */
+Args:
+	string - string to escape
+Returns:
+	escaped string or NULL
+Copyright:
+	This function is based on PHP implementation of ldap_escape, see LICENSE-php  */
 static char *ldap_escape_filter(const char *string) {
 	char map[256] = { 0 };
 	const char unsafe[] = "\\*()\0";
@@ -453,7 +453,7 @@ static char *ldap_escape_filter(const char *string) {
 }
 
 /* Callback for ini parser,
-	Args, returns: see ini.h */
+Args, returns: see ini.h */
 static int ini_callback(void *user, const char *section, const char *name, const char *value) {
 	int i, name_match, section_match;
 	const size_t cfg_size = sizeof(cfg) / sizeof(cfg[0]);
@@ -468,10 +468,10 @@ static int ini_callback(void *user, const char *section, const char *name, const
 }
 
 /* Run an LDAP query, and return the DN of a single result.
-	Args:
-		base, scope, filter - LDAP search parameters
-		dn - if not NULL, receives the single DN found, otherwise unchanged
-	Returns: number of entries found */
+Args:
+	base, scope, filter - LDAP search parameters
+	dn - if not NULL, receives the single DN found, otherwise unchanged
+Returns: number of entries found */
 static int search_dn(const char *base, int scope, const char *filter, char **dn) {
 	int rc, n = 0;
 	LDAPMessage *res = NULL;
@@ -503,10 +503,10 @@ end:
 }
 
 /* Convert scope keyword string to numeric value.
-	Args:
-		scope_str - scope keyword
-	Returns:
-		numeric scope for LDAP library */
+Args:
+	scope_str - scope keyword
+Returns:
+	numeric scope for LDAP library */
 static inline int get_scope(const char *scope_str) {
 	typedef struct {
 		const char *kw;
