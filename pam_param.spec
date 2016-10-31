@@ -1,5 +1,8 @@
 # Copyright 2016 Development Gateway, Inc
 # This file is part of pam_param, see COPYING
+%define esc_sha  ed4d4e107cc2279858818005b684f4f1b17e86d6
+%define inih_sha 5dbf5cb6b4027d5937726b8c499bd93c5b7d935d
+
 Name:           pam_param
 Version:        0.1
 Release:        %{rel}%{!?rel:1}
@@ -7,7 +10,8 @@ License:        GPLv3
 Vendor:         Development Gateway
 Summary:        PAM module for configurable LDAP account lookups
 Source:         %name.zip
-Source1:        inih.zip
+Source1:        https://github.com/benhoyt/inih/archive/%{inih_sha}.zip
+Source2:        https://github.com/devgateway/ldapescape/archive/%{esc_sha}.zip
 BuildRequires:  cmake >= 2.8.11
 
 %package test
@@ -31,6 +35,7 @@ Account facility test utility for %name PAM module.
 %prep
 %setup -n %name
 %setup -D -T -a 1 -n %name
+%setup -D -T -a 2 -n %name
 
 %build
 cmake \
