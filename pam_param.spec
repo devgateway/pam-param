@@ -3,7 +3,7 @@
 Name:           pam_param
 Version:        0.1
 Release:        %{rel}%{!?rel:1}
-License:        GPLv3, PHP 3.01
+License:        GPLv3
 Vendor:         Development Gateway
 Summary:        PAM module for configurable LDAP account lookups
 Source:         %name.zip
@@ -51,7 +51,6 @@ install -m 0644 samples/pam_param_test.pamd %buildroot%{_pamconfdir}/pam_param_t
 %files
 %{_moduledir}/*
 %config %attr(0600,-,-) %{_secconfdir}/%name.ini
-%doc COPYING-php
 %doc COPYING
 
 %files test
