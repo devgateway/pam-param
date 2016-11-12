@@ -29,3 +29,5 @@ install(TARGETS pam_param pam_param_test
 	RUNTIME DESTINATION "${SBINDIR}"
 	LIBRARY DESTINATION "${MODULEDIR}"
 	NAMELINK_SKIP)
+
+add_subdirectory(man)

@@ -55,6 +55,7 @@ install -m 0644 samples/pam_param_test.pamd %buildroot%{_pamconfdir}/pam_param_t
 
 %files
 %{_moduledir}/*
+%_mandir/man*/*
 %config %attr(0600,-,-) %{_secconfdir}/%name.ini
 %doc COPYING
 
