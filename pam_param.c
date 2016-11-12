@@ -130,9 +130,9 @@ int pam_sm_acct_mgmt(pam_handle_t *pamh, int flags, int argc, const char *argv[]
 	result = authorize_user(user_dn, host_dn);
 
 end:
-	ldap_unbind_ext(ld, NULL, NULL);
 	if (user_dn) ldap_memfree(user_dn);
 	if (host_dn) ldap_memfree(host_dn);
+	ldap_unbind_ext(ld, NULL, NULL);
 
 	return result;
 }
