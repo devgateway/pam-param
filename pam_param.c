@@ -155,7 +155,7 @@ static inline int read_config() {
 			pam_syslog(pam, LOG_CRIT,
 					CONFIG_FILE ": missing setting '%s' in section '%s'",
 					cfg_lines[i].name, cfg_lines[i].section);
-			return 1;
+			return 0;
 		}
 	}
 
