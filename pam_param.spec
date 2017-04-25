@@ -1,18 +1,18 @@
 # Copyright 2016 Development Gateway, Inc
 # This file is part of pam_param, see COPYING
 %define esc_sha  ed4d4e107cc2279858818005b684f4f1b17e86d6
-%define inih_sha 18a67c516358e2791ab720a1abe411d991774f3e
+%define inih_sha f5609c8eae118fc3053c2fe3d02c023c8f0d176c
 
-Name:           pam_param
-Version:        0.1
+Name:           pam-param
+Version:        0.2
 Release:        %{rel}%{!?rel:1}
 License:        GPLv3
 Vendor:         Development Gateway
 Summary:        PAM module for configurable LDAP account lookups
-Source:         %name.zip
-Source1:        https://github.com/benhoyt/inih/archive/%{inih_sha}.zip
-Source2:        https://github.com/devgateway/ldapescape/archive/%{esc_sha}.zip
-BuildRequires:  cmake >= 2.8.11
+Source:         https://github.com/devgateway/pam-param/archive/v%{version}.tar.gz
+Source1:        https://github.com/benhoyt/inih/archive/%{inih_sha}.tar.gz
+Source2:        https://github.com/devgateway/ldapescape/archive/%{esc_sha}.tar.gz
+#BuildRequires:  cmake >= 2.8.11
 
 %package test
 Summary:        Test utility for %name PAM module
@@ -33,9 +33,9 @@ Account facility test utility for %name PAM module.
 %define _pamconfdir %{_sysconfdir}/pam.d
 
 %prep
-%setup -n %name
-%setup -D -T -a 1 -n %name
-%setup -D -T -a 2 -n %name
+%setup
+gzip -dc "%SOURCE1" | tar -C inih -xvvf - --strip-components=1
+gzip -dc "%SOURCE2" | tar -C ldapescape -xvvf - --strip-components=1
 
 %build
 cmake \
