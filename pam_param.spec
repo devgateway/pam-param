@@ -1,7 +1,8 @@
-# Copyright 2016 Development Gateway, Inc
+# Copyright 2016-2017 Development Gateway, Inc
 # This file is part of pam_param, see COPYING
 %define esc_sha  ed4d4e107cc2279858818005b684f4f1b17e86d6
 %define inih_sha f5609c8eae118fc3053c2fe3d02c023c8f0d176c
+%define module_name pam_param
 
 Name:           pam-param
 Version:        0.2
@@ -39,7 +40,7 @@ gzip -dc "%SOURCE2" | tar -C ldapescape -xvvf - --strip-components=1
 
 %build
 cmake \
-	-DCONFIGFILE:FILE=%{_secconfdir}/%name.ini \
+	-DCONFIGFILE:FILE=%{_secconfdir}/%{module_name}.ini \
 	-DMODULEDIR:PATH=%{_moduledir} \
 	-DSBINDIR:PATH=%_sbindir \
 	-DCMAKE_BUILD_TYPE=RelWithDebInfo \
@@ -56,12 +57,12 @@ install -m 0644 samples/pam_param_test.pamd %buildroot%{_pamconfdir}/pam_param_t
 %files
 %{_moduledir}/*
 %_mandir/man*/*
-%config %attr(0600,-,-) %{_secconfdir}/%name.ini
+%config %attr(0600,-,-) %{_secconfdir}/%{module_name}.ini
 %doc COPYING
 
 %files test
 %_sbindir/*
-%config %{_pamconfdir}/%{name}_test
+%config %{_pamconfdir}/%{module_name}_test
 
 %clean
 rm -rf %_buildrootdir
