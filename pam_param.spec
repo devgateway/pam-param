@@ -13,7 +13,7 @@ Summary:        PAM module for configurable LDAP account lookups
 Source:         https://github.com/devgateway/pam-param/archive/v%{version}.tar.gz
 Source1:        https://github.com/benhoyt/inih/archive/%{inih_sha}.tar.gz
 Source2:        https://github.com/devgateway/ldapescape/archive/%{esc_sha}.tar.gz
-BuildRequires:  cmake >= 2.8.11
+BuildRequires:  cmake >= 2.8.11, make, gcc, openldap-devel, pam-devel
 
 %package test
 Summary:        Test utility for %name PAM module
