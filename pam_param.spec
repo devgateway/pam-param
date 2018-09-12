@@ -1,11 +1,11 @@
 # Copyright 2016-2017 Development Gateway, Inc
 # This file is part of pam_param, see COPYING
-%define esc_sha  ed4d4e107cc2279858818005b684f4f1b17e86d6
-%define inih_sha f5609c8eae118fc3053c2fe3d02c023c8f0d176c
+%define esc_sha  5795e78c34b7720aee938806c3606defcb0711de
+%define inih_sha 0ee2bf26abccc63ee0a5a416ed9cdf4d113d8c25
 %define module_name pam_param
 
 Name:           pam-param
-Version:        0.2
+Version:        0.3
 Release:        %{rel}%{!?rel:1}
 License:        GPLv3
 Vendor:         Development Gateway
@@ -52,7 +52,7 @@ make DESTDIR=%buildroot install
 mkdir -p %buildroot%{_secconfdir}
 install -m 0660 samples/pam_param.ini %buildroot%{_secconfdir}/
 mkdir -p %buildroot%{_pamconfdir}
-install -m 0644 samples/pam_param_test.pamd %buildroot%{_pamconfdir}/pam_param_test
+install -m 0644 samples/pam_param_test.pam %buildroot%{_pamconfdir}/pam_param_test
 
 %files
 %{_moduledir}/*
