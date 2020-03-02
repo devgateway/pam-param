@@ -1,11 +1,11 @@
 # Copyright 2016-2017 Development Gateway, Inc
 # This file is part of pam_param, see COPYING
-%define esc_sha  5795e78c34b7720aee938806c3606defcb0711de
+%define esc_sha  73661eb04b767e6390ec60ce9b83b4a109d3da58
 %define inih_sha 0ee2bf26abccc63ee0a5a416ed9cdf4d113d8c25
 %define module_name pam_param
 
 Name:           pam-param
-Version:        0.3
+Version:        0.4
 Release:        %{rel}%{!?rel:1}
 License:        GPLv3
 Vendor:         Development Gateway
