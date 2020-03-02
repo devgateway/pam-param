@@ -6,4 +6,4 @@
 	url = https://github.com/devgateway/ldapescape.git
 [submodule "debian"]
 	path = debian
-	url = https://github.com:devgateway/pam-param-packaging.git
+	url = https://github.com/devgateway/pam-param-packaging.git
