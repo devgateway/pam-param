@@ -29,7 +29,6 @@ accounts which will have access to any host.
 %description test
 Account facility test utility for %name PAM module.
 
-%define _moduledir %{_libdir}/security
 %define _secconfdir %{_sysconfdir}/security
 %define _pamconfdir %{_sysconfdir}/pam.d
 
@@ -39,12 +38,7 @@ gzip -dc "%SOURCE1" | tar -C inih -xvvf - --strip-components=1
 gzip -dc "%SOURCE2" | tar -C ldapescape -xvvf - --strip-components=1
 
 %build
-cmake \
-	-DCONFIGFILE:FILE=%{_secconfdir}/%{module_name}.ini \
-	-DMODULEDIR:PATH=%{_moduledir} \
-	-DSBINDIR:PATH=%_sbindir \
-	-DCMAKE_BUILD_TYPE=RelWithDebInfo \
-	.
+cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo .
 make
 
 %install
@@ -55,14 +49,14 @@ mkdir -p %buildroot%{_pamconfdir}
 install -m 0644 samples/pam_param_test.pam %buildroot%{_pamconfdir}/pam_param_test
 
 %files
-%{_moduledir}/*
-%_mandir/man*/*
+%{_libdir}/security/*
+%{_mandir}/man*/*
 %config %attr(0600,-,-) %{_secconfdir}/%{module_name}.ini
 %doc COPYING
 
 %files test
-%_sbindir/*
+%{_sbindir}/*
 %config %{_pamconfdir}/%{module_name}_test
 
 %clean
-rm -rf %_buildrootdir
+rm -rf %{_buildrootdir}
